@@ -6,7 +6,10 @@ import path from 'node:path';
 import type { GalleryImage, PortfolioContent, Project, SiteSettings } from '@/lib/content-types';
 import { seedContent } from '@/lib/seed-content';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+// On Vercel (and Lambda-based hosts) process.cwd() is read-only at runtime.
+// Use /tmp which is always writable on serverless runtimes.
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const DATA_DIR = IS_SERVERLESS ? '/tmp/portfolio-data' : path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'portfolio.sqlite');
 const CONTENT_KEYS = ['projects', 'galleryImages', 'skills', 'marquee', 'timeline', 'testimonials', 'siteSettings'] as const;
 
