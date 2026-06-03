@@ -872,7 +872,7 @@ function AboutSection({
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-5 pb-8 pt-10 sm:px-8 sm:pb-20 md:pt-0 lg:px-10 lg:pb-32 overflow-hidden lg:overflow-visible">
-      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:-mt-20 lg:-mt-28 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
+      <div className="flex snap-x snap-mandatory touch-auto gap-4 overflow-x-auto pb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:-mt-20 lg:-mt-28 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
         {timeline.map((item, index) => {
           const Icon = getIcon(item.iconKey);
           return (
@@ -1115,7 +1115,7 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
         {/* Right vignette — hints at more cards on mobile */}
         <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-[var(--background)] to-transparent lg:hidden" />
         <div
-          className="flex snap-x snap-mandatory touch-pan-x gap-4 overflow-x-auto overflow-y-hidden scroll-pl-5 px-5 pb-4 sm:scroll-pl-8 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:touch-auto lg:grid lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0 lg:pb-0"
+          className="flex snap-x snap-mandatory touch-auto gap-4 overflow-x-auto overflow-y-hidden scroll-pl-5 px-5 sm:scroll-pl-8 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0"
         >
           <AnimatePresence mode="popLayout">
             {filtered.map((project, index) => (
@@ -1671,11 +1671,8 @@ function CreativeProjectsSection({
 
     const frame = requestAnimationFrame(() => {
       const revealOffset = Math.min(220, scroller.clientHeight * 0.25);
-      const previousScrollBehavior = scroller.style.scrollBehavior;
-      scroller.style.scrollBehavior = 'auto';
-      expandedSection.scrollIntoView({ block: 'start', behavior: 'auto' });
-      scroller.scrollTop = Math.max(0, scroller.scrollTop - revealOffset);
-      scroller.style.scrollBehavior = previousScrollBehavior;
+      const targetTop = expandedSection.offsetTop - revealOffset;
+      scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
     });
 
     return () => cancelAnimationFrame(frame);
@@ -1695,7 +1692,7 @@ function CreativeProjectsSection({
 
   return (
     <>
-    <section ref={sectionRef} id="more-work" className="relative h-[320svh] bg-[#06080d] md:h-[218svh]">
+    <section ref={sectionRef} id="more-work" className="relative h-[200svh] bg-[#06080d] md:h-[218svh]">
       <div className="sticky top-0 h-screen overflow-hidden bg-black">
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_45%_30%_at_50%_50%,rgba(255,255,255,0.06),transparent_74%)]" />
 
