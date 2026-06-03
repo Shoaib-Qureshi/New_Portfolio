@@ -73,7 +73,7 @@ export const projects: Project[] = [
         phase: '02',
         title: 'Frontend Engineering',
         detail:
-          'Built the React SPA with optimistic UI updates — access gates reflected instantly on payment success. Used Zustand for local state and React Query for server sync.',
+          'Built the React SPA with optimistic UI updates. Access gates reflected instantly on payment success. Used Zustand for local state and React Query for server sync.',
       },
       {
         phase: '03',

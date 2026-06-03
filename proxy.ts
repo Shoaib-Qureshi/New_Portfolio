@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const adminCookieName = 'portfolio_admin_session';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (!pathname.startsWith('/admin') || pathname === '/admin/login') return NextResponse.next();
   if (request.cookies.has(adminCookieName)) return NextResponse.next();

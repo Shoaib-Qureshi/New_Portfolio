@@ -13,9 +13,15 @@ export function CustomCursor() {
   const smoothY = useSpring(y, { stiffness: 420, damping: 36, mass: 0.7 });
 
   useEffect(() => {
-    const finePointer = window.matchMedia('(pointer: fine)').matches;
-    setEnabled(finePointer);
-    if (!finePointer) return;
+    const finePointerQuery = window.matchMedia('(pointer: fine)');
+    const desktopWidthQuery = window.matchMedia('(min-width: 768px)');
+    const updateEnabled = () => {
+      const shouldEnable = finePointerQuery.matches && desktopWidthQuery.matches;
+      setEnabled(shouldEnable);
+      return shouldEnable;
+    };
+
+    if (!updateEnabled()) return;
 
     const onMove = (event: MouseEvent) => {
       x.set(event.clientX);
@@ -27,8 +33,14 @@ export function CustomCursor() {
         setHovering(nextHovering);
       }
     };
+    finePointerQuery.addEventListener('change', updateEnabled);
+    desktopWidthQuery.addEventListener('change', updateEnabled);
     window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
+    return () => {
+      finePointerQuery.removeEventListener('change', updateEnabled);
+      desktopWidthQuery.removeEventListener('change', updateEnabled);
+      window.removeEventListener('mousemove', onMove);
+    };
   }, [x, y]);
 
   if (!enabled) return null;

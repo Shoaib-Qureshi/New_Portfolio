@@ -1,4 +1,4 @@
-# Shoaib Qureshi Portfolio
+s Shoaib Qureshi Portfolio
 
 Dark, cinematic personal portfolio built with Next.js, React, Tailwind CSS, Framer Motion, GSAP, Three.js, and Spline.
 
@@ -35,7 +35,7 @@ Open:
 ```txt
 http://localhost:3000
 ```
-
+s
 Build for production:
 
 ```bash

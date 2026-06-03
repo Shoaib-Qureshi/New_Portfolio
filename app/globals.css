@@ -14,8 +14,7 @@
   --accent: #f5f5f5;
   --accent-rgb: 245, 245, 245;
   --accent-soft: rgba(255,255,255,.08);
-  --teal: #f5f5f5;
-  --blue: #f5f5f5;
+  /* --cool-rgb and --cool-soft-rgb aliased to accent so existing JSX references still resolve */
   --cool-rgb: 245, 245, 245;
   --cool-soft-rgb: 245, 245, 245;
 }
@@ -26,7 +25,7 @@
 
 html {
   background: var(--background);
-  scroll-behavior: smooth;
+  /* scroll-behavior: smooth is intentionally absent — the scroll container is an inner div, not html */
 }
 
 body {

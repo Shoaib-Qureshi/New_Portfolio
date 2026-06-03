@@ -115,7 +115,9 @@ export function FluidParticlesBackground({
       canvas.style.height = `${rect.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      particles = Array.from({ length: prefersReduced ? Math.floor(particleCount * 0.35) : particleCount }, () => ({
+      const isMobileElement = rect.width < 768;
+      const effectiveCount = isMobileElement ? Math.min(400, particleCount) : particleCount;
+      particles = Array.from({ length: prefersReduced ? Math.floor(effectiveCount * 0.35) : effectiveCount }, () => ({
         x: Math.random() * rect.width,
         y: Math.random() * rect.height,
         size: Math.random() * (particleSize.max - particleSize.min) + particleSize.min,

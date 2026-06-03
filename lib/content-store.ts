@@ -3,16 +3,19 @@ import 'server-only';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { PortfolioContent, Project } from '@/lib/content-types';
+import type { GalleryImage, PortfolioContent, Project, SiteSettings } from '@/lib/content-types';
 import { seedContent } from '@/lib/seed-content';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'portfolio.sqlite');
-const CONTENT_KEYS = ['projects', 'skills', 'marquee', 'timeline', 'testimonials'] as const;
+const CONTENT_KEYS = ['projects', 'galleryImages', 'skills', 'marquee', 'timeline', 'testimonials', 'siteSettings'] as const;
+
+const DEFAULT_SITE_SETTINGS: SiteSettings = { hiddenSections: ['testimonials'], hiddenProjects: [] };
 const PROJECT_COLORS_BY_ID: Record<string, string> = {
   prepmedico: '#F5F5F5',
-  'magic-loft': '#F5F5F5',
-  arau: '#F5F5F5',
+  liquidflow: '#F5F5F5',
+  threadwrite: '#F5F5F5',
+  'ananth-decodes': '#F5F5F5',
 };
 
 type ContentKey = (typeof CONTENT_KEYS)[number];
@@ -70,13 +73,36 @@ function readKey<T>(key: ContentKey, fallback: T): T {
 }
 
 export function getPortfolioContent(): PortfolioContent {
+  const projects = normalizeProjectColors(readKey('projects', seedContent.projects));
   return {
-    projects: normalizeProjectColors(readKey('projects', seedContent.projects)),
+    projects,
+    galleryImages: readKey('galleryImages', buildGalleryFallback(projects)),
     skills: readKey('skills', seedContent.skills),
     marquee: readKey('marquee', seedContent.marquee),
     timeline: readKey('timeline', seedContent.timeline),
     testimonials: readKey('testimonials', seedContent.testimonials),
+    siteSettings: readKey('siteSettings', DEFAULT_SITE_SETTINGS),
   };
+}
+
+function buildGalleryFallback(projects: Project[]): GalleryImage[] {
+  return projects
+    .flatMap((project) => [
+    {
+      src: project.image.src,
+      alt: project.image.alt,
+      title: project.title,
+      sub: project.category,
+      link: project.link,
+    },
+    {
+      src: project.processImage.src,
+      alt: project.processImage.alt,
+      title: project.category,
+      sub: project.tags[0] ?? '',
+    },
+  ])
+    .filter((image) => Boolean(image.src));
 }
 
 function normalizeProjectColors(projects: Project[]) {

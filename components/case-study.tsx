@@ -8,6 +8,7 @@ import {
   useTransform,
 } from 'framer-motion';
 import { ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRef } from 'react';
 import type { Project } from '@/lib/content-types';
@@ -136,14 +137,14 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
             <div
               role="img"
               aria-label={project.image.alt}
-              className="absolute inset-0 size-full bg-cover bg-right opacity-[0.48] saturate-[0.52]"
-              style={{ backgroundImage: `url(${project.image.src})` }}
+              className="absolute inset-0 size-full bg-cover opacity-[0.72] saturate-[0.85]"
+              style={{ backgroundImage: `url(${project.image.src})`, backgroundPosition: 'right 30%' }}
             />
             <div
               className="absolute inset-0"
               style={{
                 background:
-                  'linear-gradient(to right, #06080d 28%, rgba(6,8,13,0.88) 48%, rgba(6,8,13,0.44) 68%, rgba(6,8,13,0.12) 100%), linear-gradient(to top, #06080d 0%, rgba(6,8,13,0.6) 24%, transparent 52%)',
+                  'linear-gradient(to right, #06080d 20%, rgba(6,8,13,0.82) 42%, rgba(6,8,13,0.28) 62%, rgba(6,8,13,0.04) 100%), linear-gradient(to top, #06080d 0%, rgba(6,8,13,0.55) 20%, transparent 48%)',
               }}
             />
           </div>
@@ -160,7 +161,7 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
             style={{ x: blobX, y: blobY }}
           />
 
-          <div className="relative z-[3] mx-auto flex min-h-screen max-w-7xl flex-col justify-end px-5 pb-20 pt-36 sm:px-8 lg:px-10 lg:pb-24">
+          <div className="relative z-[3] mx-auto flex min-h-screen max-w-7xl flex-col justify-end px-5 pb-12 pt-28 sm:px-8 md:pb-20 md:pt-36 lg:px-10 lg:pb-24">
             {/* Eyebrow */}
             <div className="overflow-hidden">
               <motion.div
@@ -192,7 +193,7 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: EASE, delay: 0.48 }}
-              className="mt-10 flex flex-col gap-6 border-t border-white/[0.08] pt-8 sm:flex-row sm:items-start sm:justify-between"
+              className="mt-7 flex flex-col gap-5 border-t border-white/[0.08] pt-6 sm:flex-row sm:items-start sm:justify-between md:mt-10 md:gap-6 md:pt-8"
             >
               <p className="max-w-lg text-base font-light leading-8 text-white/52">
                 {project.desc}
@@ -212,7 +213,7 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
                     href={project.link}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/16 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/60 transition hover:border-white/32 hover:text-white"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-white/[0.12] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md transition hover:border-white/64 hover:bg-white/[0.20]"
                   >
                     Live site <ExternalLink className="size-3" />
                   </a>
@@ -223,7 +224,7 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
         </section>
 
         {/* ── HIGHLIGHTS ────────────────────────────────────────── */}
-        <section className="mx-auto max-w-7xl px-5 pb-14 pt-6 sm:px-8 lg:px-10">
+        <section className="mx-auto max-w-7xl px-5 pb-10 pt-4 sm:px-8 md:pb-14 md:pt-6 lg:px-10">
           <motion.div
             initial="hidden"
             whileInView="show"
@@ -251,8 +252,8 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
         <div className="mx-auto max-w-7xl border-t border-white/8 px-5 sm:px-8 lg:px-10" />
 
         {/* ── CHALLENGE + SOLUTION ──────────────────────────────── */}
-        <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-10">
-          <div className="grid gap-14 lg:grid-cols-2 lg:gap-20">
+        <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 md:py-20 lg:px-10">
+          <div className="grid gap-8 md:gap-14 lg:grid-cols-2 lg:gap-20">
             {[
               { eyebrow: 'The Challenge', heading: 'What needed solving', body: project.challenge },
               { eyebrow: 'The Approach', heading: 'How we got there', body: project.solution },
@@ -283,23 +284,27 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
         </section>
 
         {/* ── PROCESS ───────────────────────────────────────────── */}
-        <section className="relative mt-8 overflow-hidden pb-24 pt-44 sm:pt-52 lg:pt-60">
-          <div className="pointer-events-none absolute inset-x-0 -top-24 h-[560px] opacity-50">
-            <img
-              src={project.processImage.src}
-              alt=""
-              aria-hidden="true"
-              className="size-full object-cover object-center saturate-[0.7]"
-            />
+        <section className="relative mt-0 pb-12 pt-12 sm:pt-52 md:mt-8 md:pb-24 lg:pt-60">
+          <div className="pointer-events-none absolute inset-x-0 -top-12 h-[280px] opacity-55 md:-top-20 md:h-[480px] md:opacity-58">
+            {project.processImage.src && (
+              <Image
+                src={project.processImage.src}
+                alt=""
+                aria-hidden="true"
+                fill
+                sizes="100vw"
+                className="object-cover object-center saturate-[0.75]"
+              />
+            )}
             <div
               className="absolute inset-0"
               style={{
-                background: 'linear-gradient(180deg, #06080d 0%, rgba(6,8,13,0.55) 18%, rgba(6,8,13,0.28) 45%, #06080d 100%), radial-gradient(circle at 28% 24%, rgba(var(--accent-rgb),0.07), transparent 32rem)',
+                background: 'linear-gradient(180deg, #06080d 0%, #06080d 16%, rgba(6,8,13,0.68) 32%, rgba(6,8,13,0.20) 50%, rgba(6,8,13,0.62) 68%, #06080d 84%)',
               }}
             />
           </div>
           <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
-          <div className="mb-12">
+          <div className="mb-8 md:mb-12">
             <Reveal>
               <div className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-white">
                 Process
@@ -335,7 +340,7 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
         </section>
 
         {/* ── ROLE + IMPACT ─────────────────────────────────────── */}
-        <section className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
+        <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 md:py-14 lg:px-10">
           <div className="grid gap-5 sm:grid-cols-2">
             {[
               { label: 'Role', value: project.role },
@@ -366,8 +371,8 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
         </section>
 
         {/* ── PROJECT NAVIGATION ────────────────────────────────── */}
-        <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-10">
-          <div className="flex items-center justify-between gap-6 border-t border-white/10 pt-12">
+        <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 md:py-16 lg:px-10">
+          <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-8 md:gap-6 md:pt-12">
             {/* Previous */}
             {prev ? (
               <Link href={`/work/${prev.id}`} className="group flex items-center gap-4">

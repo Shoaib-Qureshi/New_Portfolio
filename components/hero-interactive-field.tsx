@@ -3,8 +3,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-const PARTICLE_COUNT = 3600;
-
 export function HeroInteractiveField() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const pointer = useRef({ x: 0, y: 0, scroll: 0, active: false });
@@ -13,12 +11,25 @@ export function HeroInteractiveField() {
     const el = mountRef.current;
     if (!el) return;
 
+    // Bail out if WebGL is unavailable (older Android, some mobile browsers)
+    const probe = document.createElement('canvas');
+    if (!probe.getContext('webgl') && !probe.getContext('experimental-webgl')) return;
+
+    const isMobile = window.innerWidth < 768;
+    const PARTICLE_COUNT = isMobile ? 800 : 3600;
+
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const renderer = new THREE.WebGLRenderer({
-      antialias: !prefersReduced,
-      alpha: true,
-      powerPreference: 'high-performance',
-    });
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: !prefersReduced && !isMobile,
+        alpha: true,
+        powerPreference: isMobile ? 'low-power' : 'high-performance',
+      });
+    } catch {
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
     renderer.setSize(el.clientWidth || 1200, el.clientHeight || 760);
     renderer.setClearColor(0x000000, 0);

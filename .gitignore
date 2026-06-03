@@ -25,9 +25,23 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Local database/runtime files
+# Local database/runtime files (DB is seeded from lib/seed-content.ts on first run;
+# never commit it — it holds runtime content + contact submissions)
+/data/*.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+# User-uploaded media (runtime, written by the admin panel)
+/data/uploads/
+
+# Email preview artifacts
+email-preview-*.html
+
+# Throwaway scripts / local screenshots
+tmp-*.cjs
+tmp-*.js
+tmp-*.png
+pw-*.png
 
 # Test and coverage output
 coverage/
@@ -36,6 +50,7 @@ playwright-report/
 
 # Local screenshots and visual-check artifacts
 bugfix-*.png
+mobile-*.png
 visual-*.png
 creative-*.png
 debug-*.png

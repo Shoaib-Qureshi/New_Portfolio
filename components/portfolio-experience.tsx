@@ -3,6 +3,7 @@
 import {
   AnimatePresence,
   motion,
+  useAnimationControls,
   useMotionTemplate,
   useMotionValue,
   useReducedMotion,
@@ -12,17 +13,16 @@ import {
 } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ArrowUpRight, Check, ChevronRight, Code2, Filter, Mail, Menu, Send, X } from 'lucide-react';
+import { ArrowDown, ArrowUpRight, Check, ChevronRight, Code2, Filter, Mail, Menu, Send, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { PortfolioContent, Project } from '@/lib/content-types';
+import type { GalleryImage, PortfolioContent, Project } from '@/lib/content-types';
 import { getIcon } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 import { CustomCursor } from '@/components/custom-cursor';
-import { FluidParticlesBackground } from '@/components/fluid-particles-background';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AnimatedShine, SectionLabel } from '@/components/magic/animated-shine';
 
 const sections = ['hero', 'about', 'work', 'testimonials', 'contact'] as const;
@@ -35,6 +35,13 @@ const HeroInteractiveField = dynamic(
 
 const SplineWorkScene = dynamic(
   () => import('@/components/spline-work-scene').then((mod) => mod.SplineWorkScene),
+  { ssr: false },
+);
+
+// Decorative below-the-fold canvas — load its JS (canvas + noise lib) on demand
+// rather than bundling it into the initial payload.
+const FluidParticlesBackground = dynamic(
+  () => import('@/components/fluid-particles-background').then((mod) => mod.FluidParticlesBackground),
   { ssr: false },
 );
 
@@ -55,7 +62,7 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const duration = 1500;
+    const duration = 900;
     const startedAt = performance.now();
     let frame = 0;
     let timeout = 0;
@@ -68,7 +75,8 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
       if (progress < 1) {
         frame = requestAnimationFrame(tick);
       } else {
-        timeout = window.setTimeout(() => setLoaderVisible(false), 220);
+        setIntroComplete(true);
+        timeout = window.setTimeout(() => setLoaderVisible(false), 80);
       }
     };
 
@@ -118,10 +126,16 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#06080d] text-[#f5f5f5]">
+      <a
+        href="#hero"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-xl focus:bg-[var(--accent)] focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-black focus:outline-none"
+      >
+        Skip to content
+      </a>
       <div className="noise" />
-      <IntroLoader value={loaderValue} visible={loaderVisible} onExitComplete={() => setIntroComplete(true)} />
+      <IntroLoader value={loaderValue} visible={loaderVisible} />
       <CustomCursor />
-      <FloatingNav active={active} onNavigate={scrollTo} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+      <FloatingNav active={active} onNavigate={scrollTo} menuOpen={menuOpen} setMenuOpen={setMenuOpen} hiddenSections={content.siteSettings.hiddenSections} />
       <div
         ref={containerRef}
         className="h-screen overflow-y-auto overflow-x-hidden overscroll-contain scroll-smooth"
@@ -129,11 +143,21 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
       >
         <HeroSection onNavigate={scrollTo} containerRef={containerRef} introComplete={introComplete} />
         <MarqueeStrip marquee={content.marquee} />
-        <AboutSection skills={content.skills} timeline={content.timeline} containerRef={containerRef} />
-        <ProjectsSection projects={content.projects} />
-        <CreativeProjectsSection projects={content.projects} containerRef={containerRef} />
-        <StickyTestimonialsSection testimonials={content.testimonials} containerRef={containerRef} />
-        <ContactSection />
+        {!content.siteSettings.hiddenSections.includes('about') && (
+          <AboutSection skills={content.skills} timeline={content.timeline} containerRef={containerRef} />
+        )}
+        {!content.siteSettings.hiddenSections.includes('work') && (
+          <ProjectsSection projects={content.projects.filter(p => !content.siteSettings.hiddenProjects.includes(p.id))} />
+        )}
+        <CreativeProjectsSection
+          projects={content.projects.filter(p => !content.siteSettings.hiddenProjects.includes(p.id))}
+          galleryImages={content.galleryImages}
+          containerRef={containerRef}
+        />
+        {!content.siteSettings.hiddenSections.includes('testimonials') && (
+          <StickyTestimonialsSection testimonials={content.testimonials} containerRef={containerRef} />
+        )}
+        {!content.siteSettings.hiddenSections.includes('contact') && <ContactSection />}
         <Footer />
       </div>
     </main>
@@ -143,18 +167,16 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
 function IntroLoader({
   value,
   visible,
-  onExitComplete,
 }: {
   value: number;
   visible: boolean;
-  onExitComplete: () => void;
 }) {
   return (
-    <AnimatePresence onExitComplete={onExitComplete}>
+    <AnimatePresence>
       {visible && (
         <motion.div
           initial={{ y: 0 }}
-          exit={{ y: '-100%', transition: { duration: 0.95, ease: [0.76, 0, 0.24, 1] } }}
+          exit={{ y: '-100%', transition: { duration: 0.56, ease: [0.76, 0, 0.24, 1] } }}
           className="fixed inset-0 z-[120] flex items-end justify-start bg-[#06080d] px-6 py-7 text-[#f5f5f5] sm:px-10 sm:py-9"
         >
           <motion.div
@@ -196,28 +218,39 @@ function FloatingNav({
   onNavigate,
   menuOpen,
   setMenuOpen,
+  hiddenSections,
 }: {
   active: SectionId;
   onNavigate: (id: SectionId) => void;
   menuOpen: boolean;
   setMenuOpen: (open: boolean) => void;
+  hiddenSections: string[];
 }) {
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen, setMenuOpen]);
+
   return (
     <header className="fixed inset-x-0 top-0 z-50 px-5 pt-4 sm:px-8 lg:px-10">
       <nav className="mx-auto flex max-w-7xl items-center justify-between">
         <button
-          className="group inline-flex size-11 items-center justify-center rounded-full text-lg font-black tracking-[-0.08em] text-white transition hover:bg-white/8"
+          className="group inline-flex size-11 items-center justify-center rounded-full text-lg font-black tracking-[-0.08em] text-white transition hover:bg-white/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           onClick={() => onNavigate('hero')}
           aria-label="Go to hero"
         >
           SQ
         </button>
         <div className="glass hidden items-center rounded-full p-1 md:flex">
-          {sections.slice(1).map((id) => (
+          {sections.slice(1).filter((id) => !hiddenSections.includes(id)).map((id) => (
             <button
               key={id}
               className={cn(
-                'relative rounded-full px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.22em] transition',
+                'relative rounded-full px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.22em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40',
                 active === id ? 'text-black' : 'text-white/48 hover:text-white',
               )}
               onClick={() => onNavigate(id)}
@@ -240,9 +273,10 @@ function FloatingNav({
           </Button>
         </div>
         <button
-          className="inline-flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white md:hidden"
+          className="inline-flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white md:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label="Toggle navigation"
+          aria-expanded={menuOpen}
         >
           {menuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
         </button>
@@ -255,11 +289,11 @@ function FloatingNav({
             exit={{ opacity: 0, y: -12 }}
             className="glass mx-4 mt-3 grid rounded-3xl p-2 md:hidden"
           >
-            {sections.map((id) => (
+            {sections.filter((id) => !hiddenSections.includes(id)).map((id) => (
               <button
                 key={id}
                 onClick={() => onNavigate(id)}
-                className="flex items-center justify-between rounded-2xl px-4 py-4 text-left text-xs font-semibold uppercase tracking-[0.2em] text-white/70"
+                className="flex items-center justify-between rounded-2xl px-4 py-4 text-left text-xs font-semibold uppercase tracking-[0.2em] text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30"
               >
                 {id}
                 <ChevronRight className="size-4 text-[var(--accent)]" />
@@ -424,18 +458,14 @@ function HeroSection({
       className="relative h-[100svh] overflow-visible bg-[#06080d]"
     >
       <div ref={meshLayerRef} className="pointer-events-none fixed inset-0 z-[1] will-change-transform">
-        <AnimatePresence>
-          {introComplete && (
-            <motion.div
-              className="pointer-events-none absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <HeroInteractiveField />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <motion.div
+          className="pointer-events-none absolute -inset-x-[22vw] -inset-y-[10vh] translate-x-[9vw] translate-y-[7vh] blur-[1.2px] md:inset-0 md:translate-x-0 md:translate-y-0 md:blur-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: introComplete ? 1 : 0.42 }}
+          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <HeroInteractiveField />
+        </motion.div>
       </div>
 
       <motion.div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[2]" style={{ background: spotlight }} />
@@ -459,16 +489,16 @@ function HeroSection({
             <span className="rounded-full border border-[rgba(var(--accent-rgb),0.38)] px-3 py-1.5 text-[var(--accent)]">Available for select builds</span>
             <span>Bengaluru, India</span>
           </div>
-          <h1 className="text-balance text-[clamp(4.2rem,15vw,12rem)] font-light leading-[0.92] tracking-[-0.075em] text-white">
-            <span ref={line1Ref} className="inline-block overflow-visible pb-[0.04em] pt-[0.08em] align-bottom will-change-transform">Shoaib</span>
+          <h1 className="text-balance text-[clamp(4.2rem,15vw,12rem)] font-light leading-[0.92] tracking-[-0.075em] text-white md:leading-[0.88]">
+            <span ref={line1Ref} className="inline-block overflow-visible pb-[0.04em] pt-[0.08em] align-bottom will-change-transform md:pt-0">Shoaib</span>
             <br />
-            <span ref={line2Ref} className="inline-block overflow-visible pb-[0.04em] pt-[0.08em] align-bottom will-change-transform">
+            <span ref={line2Ref} className="inline-block overflow-visible pb-[0.04em] pt-[0.08em] align-bottom will-change-transform md:pt-0">
               Qureshi<span className="text-[var(--accent)]">.</span>
             </span>
           </h1>
           <div className="mt-7 grid max-w-3xl gap-5 md:grid-cols-[1fr_auto] md:items-end">
             <p ref={subcopyRef} className="max-w-2xl text-sm leading-7 text-white/58 sm:text-base">
-              Frontend developer crafting cinematic interfaces, precise CMS workflows, and polished commerce experiences with React, WordPress, and modern web systems.
+              Senior frontend developer crafting cinematic interfaces, React and Laravel applications, and AI-powered tools across Next.js, WordPress, and WooCommerce.
             </p>
             <div ref={ctaRef}>
               <Button onClick={() => onNavigate('work')} className="w-max">
@@ -543,7 +573,7 @@ function MetricHeroCard() {
         <div className="size-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_5px_var(--accent)]" />
         <span className="text-[8px] font-semibold uppercase tracking-[0.24em] text-white/36">Experience</span>
       </div>
-      <div className="mt-3 text-[2.6rem] font-light leading-none tracking-[-0.07em] text-white">3<span className="text-[var(--accent)]">+</span></div>
+      <div className="mt-3 text-[2.6rem] font-light leading-none tracking-[-0.07em] text-white">4<span className="text-[var(--accent)]">+</span></div>
       <div className="mt-1 text-[10px] text-white/36">yrs building products</div>
       {/* mini bar chart */}
       <div className="mt-4 flex h-6 items-end gap-[3px]">
@@ -565,7 +595,7 @@ function MetricHeroCard() {
 }
 
 function TechStackHeroCard() {
-  const tags = ['React', 'Next.js', 'TypeScript', 'WordPress', 'WooCommerce', 'Elementor'];
+  const tags = ['React', 'Next.js', 'TypeScript', 'Laravel', 'WordPress', 'WooCommerce'];
   return (
     <GlassCard>
       <div className="mb-3 flex items-center justify-between">
@@ -589,7 +619,7 @@ function TechStackHeroCard() {
         ))}
       </div>
       <div className="mt-3.5 border-t border-white/[0.06] pt-3 text-[9px] text-white/28">
-        Frontend · 3 yrs · 25+ projects
+        Frontend · 4 yrs · 25+ projects
       </div>
     </GlassCard>
   );
@@ -655,14 +685,31 @@ function AvailabilityHeroCard() {
    MARQUEE
 ───────────────────────────────────────────────────────── */
 function MarqueeStrip({ marquee }: { marquee: PortfolioContent['marquee'] }) {
+  const controls = useAnimationControls();
   const items = [...marquee, ...marquee, ...marquee];
+
+  useEffect(() => {
+    controls.start({ x: ['0%', '-33.333%'], transition: { duration: 28, ease: 'linear', repeat: Infinity } });
+  }, [controls]);
+
+  const pause = () => controls.stop();
+  const resume = () =>
+    controls.start({ x: ['0%', '-33.333%'], transition: { duration: 28, ease: 'linear', repeat: Infinity } });
+
   return (
-    <div className="relative z-10 overflow-hidden border-y border-white/10 bg-[#06080d]/90 py-4">
+    <div
+      className="relative z-20 overflow-hidden border-y border-white/10 bg-[#06080d]/95 py-4"
+      onMouseEnter={pause}
+      onMouseLeave={resume}
+      onFocus={pause}
+      onBlur={resume}
+      aria-label="Technology stack, pauses on hover"
+    >
       <motion.div
         data-visual-ignore="true"
         className="flex w-max gap-12 whitespace-nowrap"
-        animate={{ x: ['0%', '-33.333%'] }}
-        transition={{ duration: 28, ease: 'linear', repeat: Infinity }}
+        animate={controls}
+        initial={{ x: '0%' }}
       >
         {items.map((item, index) => (
           <span
@@ -753,62 +800,62 @@ function AboutSection({
   }, [containerRef]);
 
   const firstText =
-    'I design and build responsive websites, Elementor builds, WordPress systems, WooCommerce stores, and React applications that feel premium without becoming ornamental.';
+    'I design and build React and Laravel applications, AI-powered tools, WordPress systems, and WooCommerce stores. Products that feel considered without becoming ornamental.';
   const secondText =
-    'My work sits between engineering, CMS craftsmanship, interaction design, and product thinking, with practical architecture and a strong eye for performance and usability.';
+    'My work spans frontend engineering, CMS architecture, and AI workflows, from automated markdown and documentation pipelines to editorial tooling, always with an eye for performance, structure, and usability.';
 
   return (
-    <section ref={sectionRef} id="about" className="relative bg-[#06080d]">
-      <div className="relative h-[190svh]">
-        <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+    <section ref={sectionRef} id="about" className="relative scroll-mt-20 bg-[#06080d]">
+      <div className="relative h-[330svh] md:h-[190svh]">
+        <div className="sticky top-0 flex h-[100svh] items-start overflow-hidden pt-28 md:items-center md:pt-0">
           <div aria-hidden="true" className="absolute inset-0 opacity-70">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_38%_at_52%_42%,rgba(255,255,255,0.055),transparent_72%),linear-gradient(to_bottom,#06080d_0%,rgba(6,8,13,0.76)_18%,rgba(6,8,13,0.45)_52%,#06080d_100%)]" />
             <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.08)_0px,rgba(255,255,255,0.08)_1px,transparent_2px,transparent_20px)] opacity-[0.055] blur-[0.3px]" />
           </div>
 
           <div className="relative z-10 mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10">
-            <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:gap-12 lg:items-center">
+            <div className="grid gap-5 lg:grid-cols-[1fr_1fr] lg:gap-12 lg:items-center">
               <div>
-                <div className="mb-8">
+                <div className="mb-5 md:mb-8">
                   <SectionLabel>About</SectionLabel>
                 </div>
-                <h2 className="text-balance text-4xl font-light leading-[0.98] tracking-[-0.055em] sm:text-6xl">
-                  Interfaces with atmosphere, speed, and intent.
+                <h2 className="text-balance text-[2.25rem] font-light leading-[0.96] tracking-[-0.055em] sm:text-6xl">
+                  Where interface craft meets engineering depth.
                 </h2>
-                <div className="mt-10 grid max-w-md grid-cols-2 gap-4">
+                <div className="mt-5 grid max-w-md grid-cols-2 gap-3 md:mt-10 md:gap-4">
                   {[
-                    ['3+', 'Years experience'],
+                    ['4+', 'Years experience'],
                     ['25+', 'Projects shipped'],
                   ].map(([value, label]) => (
-                    <div key={label} className="glass rounded-3xl p-5">
-                      <div className="text-4xl font-light tracking-[-0.06em] text-white">{value}</div>
-                      <div className="mt-2 text-[10px] uppercase tracking-[0.18em] text-white/42">{label}</div>
+                    <div key={label} className="glass rounded-3xl p-3.5 md:p-5">
+                      <div className="text-3xl font-light tracking-[-0.06em] text-white md:text-4xl">{value}</div>
+                      <div className="mt-1.5 text-[9px] uppercase tracking-[0.18em] text-white/42 md:mt-2 md:text-[10px]">{label}</div>
                     </div>
                   ))}
                 </div>
               </div>
               <div className="relative max-w-xl lg:ml-auto">
-                <div className="relative min-h-[13rem]">
+                <div className="relative min-h-[8.4rem] md:min-h-[13rem]">
                 <ScrollRevealText
                   text={firstText}
                   progress={textProgress}
                   revealStart={0.03}
-                  revealEnd={0.28}
-                  exitStart={0.38}
-                  exitEnd={0.48}
+                  revealEnd={0.2}
+                  exitStart={0.34}
+                  exitEnd={0.44}
                   initialWords={4}
                 />
                 <LineRevealText
                   text={secondText}
                   progress={textProgress}
-                  revealStart={0.46}
-                  revealEnd={0.74}
+                  revealStart={0.44}
+                  revealEnd={0.68}
                   exitStart={1.2}
                   exitEnd={1.3}
                   className="absolute inset-x-0 top-0"
                 />
                 </div>
-                <div className="mt-8 flex flex-wrap gap-2">
+                <div className="mt-2 flex max-h-[7.4rem] flex-wrap gap-2 overflow-hidden md:mt-8 md:max-h-none">
                   {skills.map((skill) => (
                     <span
                       key={skill}
@@ -824,8 +871,8 @@ function AboutSection({
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-5 pb-24 sm:px-8 lg:px-10 lg:pb-32">
-      <div className="-mt-20 grid gap-4 lg:-mt-28 lg:grid-cols-3">
+      <div className="relative z-10 mx-auto max-w-7xl px-5 pb-8 pt-10 sm:px-8 sm:pb-20 md:pt-0 lg:px-10 lg:pb-32 overflow-hidden lg:overflow-visible">
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:-mt-20 lg:-mt-28 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
         {timeline.map((item, index) => {
           const Icon = getIcon(item.iconKey);
           return (
@@ -835,7 +882,7 @@ function AboutSection({
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: index * 0.1 }}
-              className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-6"
+              className="group relative w-[80%] shrink-0 snap-start overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-6 sm:w-[56%] lg:w-auto"
             >
               <AnimatedShine />
               <Icon className="mb-8 size-5 text-[var(--accent)]" />
@@ -846,6 +893,8 @@ function AboutSection({
             </motion.div>
           );
         })}
+        {/* Trailing spacer — WebKit clips right padding inside overflow scroll; a flex child is not */}
+        <span className="w-1 shrink-0 lg:hidden" aria-hidden="true" />
       </div>
       </div>
     </section>
@@ -931,12 +980,23 @@ function LineRevealText({
   exitEnd: number;
   className?: string;
 }) {
-  const lines = [
-    'My work sits between engineering, CMS craftsmanship,',
-    'interaction design, and product thinking,',
-    'with practical architecture and a strong eye',
-    'for performance and usability.',
-  ];
+  // Break text into ~38-char lines at word boundaries for the per-line reveal animation.
+  // Kept short so each chunk fits the column at the large heading size without re-wrapping.
+  const lines = (() => {
+    const words = text.split(' ');
+    const result: string[] = [];
+    let line = '';
+    for (const word of words) {
+      if (line.length + word.length + 1 > 38 && line) {
+        result.push(line);
+        line = word;
+      } else {
+        line = line ? `${line} ${word}` : word;
+      }
+    }
+    if (line) result.push(line);
+    return result;
+  })();
   const revealRange = Math.max(0.001, revealEnd - revealStart);
   const exitRange = Math.max(0.001, exitEnd - exitStart);
   const enterRaw = Math.min(1, Math.max(0, (progress - revealStart) / Math.min(0.08, revealRange)));
@@ -986,14 +1046,22 @@ function LineRevealText({
 function ProjectsSection({ projects }: { projects: Project[] }) {
   const categories = useMemo(() => ['All', ...Array.from(new Set(projects.map((p) => p.category)))], []);
   const [filter, setFilter] = useState('All');
-  const [selected, setSelected] = useState<Project | null>(null);
   const filtered = filter === 'All' ? projects : projects.filter((p) => p.category === filter);
+  const [showSpline, setShowSpline] = useState(false);
+  useEffect(() => {
+    // Only load the heavy Spline 3D runtime on capable desktops. Mobile/touch
+    // devices and reduced-motion users get the gradient fallback instead, saving
+    // a large WebGL context + scene download.
+    const capable = window.matchMedia('(min-width: 1024px) and (pointer: fine)').matches;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (capable && !reduce) setShowSpline(true);
+  }, []);
 
   return (
-    <section id="work" className="relative mx-auto max-w-7xl overflow-hidden px-5 py-24 sm:px-8 lg:px-10 lg:py-32">
-      <div className="pointer-events-none absolute inset-x-[-22%] top-[-13rem] z-0 h-[58rem] opacity-[0.62] sm:top-[-16rem] sm:h-[68rem] lg:inset-x-[-16%] lg:h-[72rem]">
-        <div className="absolute inset-0 origin-[58%_38%] scale-[1.22] sm:scale-[1.16] lg:scale-[1.08]">
-          <SplineWorkScene />
+    <section id="work" className="relative mx-auto max-w-7xl scroll-mt-20 overflow-hidden px-5 pb-4 pt-4 sm:px-8 sm:pt-24 lg:px-10 lg:py-32">
+      <div className="pointer-events-none absolute inset-x-[-46%] top-[-2rem] z-0 h-[38rem] opacity-[0.62] sm:inset-x-[-22%] sm:top-[-16rem] sm:h-[68rem] lg:inset-x-[-16%] lg:h-[72rem]">
+        <div className="absolute inset-0 origin-[52%_38%] scale-[1.1] sm:origin-[58%_38%] sm:scale-[1.16] lg:scale-[1.08]">
+          {showSpline && <SplineWorkScene />}
         </div>
       </div>
       <div
@@ -1010,9 +1078,9 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
         <div className="max-w-4xl">
           <SectionLabel>Selected Work</SectionLabel>
           <h2 className="text-balance text-5xl font-light leading-none tracking-[-0.055em] sm:text-7xl">
-            Case studies with
+            Built to ship.
             <br />
-            product depth.
+            Engineered to last.
           </h2>
         </div>
         <motion.div
@@ -1020,7 +1088,7 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, delay: 0.15 }}
-          className="flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-1 lg:justify-end"
+          className="flex max-w-full flex-nowrap gap-2 overflow-hidden pb-1 lg:justify-end"
         >
           {categories.map((category) => (
             <button
@@ -1040,20 +1108,29 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
         </motion.div>
       </motion.div>
 
-      <motion.div layout className="relative z-10 grid gap-5 lg:grid-cols-3">
-        <AnimatePresence mode="popLayout">
-          {filtered.map((project, index) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              index={index}
-              onOpen={() => setSelected(project)}
-            />
-          ))}
-        </AnimatePresence>
-      </motion.div>
+      {/* Mobile: snap-scroll carousel / Desktop: auto-reflow grid */}
+      {/* Full-bleed breakout so the carousel spans edge-to-edge; vignette lives in the same
+          breakout box so it aligns to the true right edge (no white strip). */}
+      <div className="relative z-10 -mx-5 sm:-mx-8 lg:mx-0">
+        {/* Right vignette — hints at more cards on mobile */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-[var(--background)] to-transparent lg:hidden" />
+        <div
+          className="flex snap-x snap-mandatory touch-pan-x gap-4 overflow-x-auto overflow-y-hidden scroll-pl-5 px-5 pb-4 sm:scroll-pl-8 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:touch-auto lg:grid lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0 lg:pb-0"
+        >
+          <AnimatePresence mode="popLayout">
+            {filtered.map((project, index) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                index={index}
+              />
+            ))}
+          </AnimatePresence>
+          {/* Trailing spacer — right padding inside overflow scroll is clipped in WebKit; a flex child is not */}
+          <span className="w-1 shrink-0 lg:hidden" aria-hidden="true" />
+        </div>
+      </div>
 
-      <ProjectModal project={selected} onClose={() => setSelected(null)} />
     </section>
   );
 }
@@ -1061,11 +1138,9 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
 function ProjectCard({
   project,
   index,
-  onOpen,
 }: {
   project: Project;
   index: number;
-  onOpen: () => void;
 }) {
   const Icon = getIcon(project.iconKey);
   return (
@@ -1077,169 +1152,72 @@ function ProjectCard({
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: index * 0.09 }}
       viewport={{ once: true, margin: '-80px' }}
       data-cursor="interactive"
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      aria-label={`Open quick view for ${project.title}`}
-      className="group relative min-h-[380px] cursor-pointer overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#0d0f14] p-5 transition duration-500 hover:-translate-y-1 hover:border-white/20 hover:bg-[#11141b] hover:shadow-[0_30px_110px_rgba(0,0,0,0.48),0_0_44px_rgba(var(--accent-rgb),0.055)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:p-6"
+      className="group relative w-[70vw] max-w-[300px] shrink-0 snap-start overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#0d0f14] transition duration-500 hover:-translate-y-1 hover:border-white/20 hover:bg-[#11141b] hover:shadow-[0_30px_110px_rgba(0,0,0,0.48),0_0_44px_rgba(var(--accent-rgb),0.055)] sm:max-w-[360px] lg:w-auto lg:max-w-none lg:shrink"
     >
-      <AnimatedShine />
+      <Link
+        href={`/work/${project.id}`}
+        className="flex h-full flex-col p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)] sm:p-6"
+        aria-label={`Read case study for ${project.title}`}
+      >
+        <AnimatedShine />
 
-      {/* Color glow */}
-      <div
-        className="absolute inset-0 opacity-45 transition duration-700 group-hover:opacity-78"
-        style={{
-          background: 'radial-gradient(circle at 72% 18%, rgba(var(--accent-rgb),0.08), transparent 34rem)',
-        }}
-      />
+        {/* Color glow */}
+        <div
+          className="absolute inset-0 opacity-45 transition duration-700 group-hover:opacity-78"
+          style={{
+            background: 'radial-gradient(circle at 72% 18%, rgba(var(--accent-rgb),0.08), transparent 34rem)',
+          }}
+        />
 
-      <div className="relative z-10 flex h-full flex-col">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-[0.2em] text-white/36">{project.num}</span>
-          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white/48">
-            {project.year}
-          </span>
-        </div>
-
-        <div className="mt-12">
-          <div className="mb-5 inline-flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.035] text-white/72 transition duration-300 group-hover:-translate-y-0.5 group-hover:border-white/18 group-hover:bg-white/[0.055] group-hover:text-white">
-            <Icon className="size-6" />
-          </div>
-          <h3 className="text-3xl font-light tracking-[-0.055em] text-white sm:text-4xl">{project.title}</h3>
-          <p className="mt-4 text-sm leading-6 text-white/52">{project.desc}</p>
-        </div>
-
-        <div className="mt-auto pt-8">
-          <div className="mb-6 flex flex-wrap gap-2">
-            {project.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-white/10 px-3 py-1.5 text-[9px] uppercase tracking-[0.14em] text-white/44"
-              >
-                {tag}
+        <div className="relative z-10 flex h-full flex-col">
+          <div className="flex items-center justify-end">
+            {project.showYear !== false && project.year && (
+              <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white/48">
+                {project.year}
               </span>
-            ))}
+            )}
           </div>
 
-          <Link
-            href={`/work/${project.id}`}
-            onClick={(event) => event.stopPropagation()}
-            aria-label={`Read case study for ${project.title}`}
-            className="inline-flex size-12 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/60 transition duration-300 group-hover:border-white group-hover:bg-white group-hover:text-black group-hover:shadow-[0_0_34px_rgba(255,255,255,0.16)] hover:border-white hover:bg-white hover:text-black"
-          >
-            <ArrowUpRight className="size-4" />
-          </Link>
+          <div className="mt-3 sm:mt-6">
+            <div className="mb-3 inline-flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.035] text-white/72 transition duration-300 group-hover:-translate-y-0.5 group-hover:border-white/18 group-hover:bg-white/[0.055] group-hover:text-white sm:mb-5 sm:size-11">
+              {project.customIcon ? (
+                <span
+                  className="flex size-5 items-center justify-center sm:size-6 [&_svg]:size-full"
+                  dangerouslySetInnerHTML={{ __html: project.customIcon }}
+                />
+              ) : (
+                <Icon className="size-5 sm:size-6" />
+              )}
+            </div>
+            <h3 className="text-2xl font-light tracking-[-0.055em] text-white sm:text-4xl">{project.title}</h3>
+            <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/52 sm:mt-4 sm:line-clamp-none">{project.desc}</p>
+          </div>
+
+          <div className="mt-auto pt-4 sm:pt-8">
+            <div className="mb-4 flex flex-wrap gap-1.5 sm:mb-6 sm:gap-2">
+              {project.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border border-white/10 px-2.5 py-1 text-[9px] uppercase tracking-[0.14em] text-white/44 sm:px-3 sm:py-1.5"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+
+            <span
+              aria-hidden="true"
+              className="inline-flex size-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/60 transition duration-300 group-hover:border-white group-hover:bg-white group-hover:text-black group-hover:shadow-[0_0_34px_rgba(255,255,255,0.16)] sm:size-12"
+            >
+              <ArrowUpRight className="size-4" />
+            </span>
+          </div>
         </div>
-      </div>
+      </Link>
     </motion.article>
   );
 }
 
-function ProjectModal({ project, onClose }: { project: Project | null; onClose: () => void }) {
-  const [renderedProject, setRenderedProject] = useState<Project | null>(project);
-  const [isClosing, setIsClosing] = useState(false);
-
-  useEffect(() => {
-    if (!project) return;
-    setRenderedProject(project);
-    setIsClosing(false);
-  }, [project]);
-
-  const closeModal = () => {
-    if (isClosing) return;
-    setIsClosing(true);
-    window.setTimeout(() => {
-      onClose();
-      setRenderedProject(null);
-      setIsClosing(false);
-    }, 280);
-  };
-
-  const activeProject = renderedProject ?? project;
-
-  return (
-    <Dialog open={Boolean(activeProject)} onOpenChange={(open) => !open && closeModal()}>
-      {activeProject && (
-        <DialogContent className="border-white/[0.08] bg-[#0d0f14]/94">
-          <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.985, filter: 'blur(8px)' }}
-            animate={
-              isClosing
-                ? { opacity: 0, y: 16, scale: 0.975, filter: 'blur(10px)' }
-                : { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }
-            }
-            transition={{ duration: isClosing ? 0.24 : 0.42, ease: [0.16, 1, 0.3, 1] }}
-            className="grid h-[72vh] overflow-hidden lg:grid-cols-[0.88fr_1.12fr]"
-          >
-            <div
-              className="relative min-h-[240px] overflow-hidden bg-[#0d0f14] p-6 sm:min-h-[300px] sm:p-8 lg:min-h-0"
-              style={{
-                backgroundImage: 'radial-gradient(circle at 50% 28%, rgba(var(--accent-rgb),0.08), transparent 24rem)',
-              }}
-            >
-              <img
-                src={activeProject.image.src}
-                alt={activeProject.image.alt}
-                onError={(event) => {
-                  event.currentTarget.style.display = 'none';
-                }}
-                className="absolute inset-0 size-full object-cover text-[0px] text-transparent opacity-80 saturate-[0.85]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-black/35 to-[#0d0f14]/90" />
-              <div className="absolute inset-6 rounded-[22px] border border-white/[0.06] bg-black/8 sm:inset-8 sm:rounded-[26px]" />
-              <div className="relative z-10 flex h-full flex-col justify-between">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-white/42">
-                  {activeProject.category} / {activeProject.year}
-                </span>
-                {(() => {
-                  const ModalIcon = getIcon(activeProject.iconKey);
-                  return <ModalIcon className="size-16 text-white/72" />;
-                })()}
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-col p-6 sm:p-8 lg:px-10 lg:pb-5 lg:pt-10">
-              <div className="min-h-0 flex-1 overflow-y-auto pr-4 [scrollbar-gutter:stable] lg:mr-6">
-                <DialogHeader>
-                  <DialogTitle>{activeProject.title}</DialogTitle>
-                  <DialogDescription>{activeProject.desc}</DialogDescription>
-                </DialogHeader>
-
-                <div className="mt-8 grid gap-4 pb-6">
-                  {[
-                    ['Role', activeProject.role],
-                    ['Impact', activeProject.impact],
-                    ['Stack', activeProject.tags.join(', ')],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-2xl border border-white/[0.08] bg-white/[0.032] p-4">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--accent)]">{label}</div>
-                      <div className="mt-1.5 text-sm leading-7 text-white/62">{value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="sticky bottom-0 border-t border-white/[0.07] bg-[#0d0f14]/96 pt-5 shadow-[0_-24px_50px_rgba(13,15,20,0.92)] lg:mr-6">
-                <Link href={`/work/${activeProject.id}`} onClick={closeModal}>
-                  <Button className="w-full">
-                    Read more
-                    <ArrowUpRight className="size-4" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </motion.div>
-        </DialogContent>
-      )}
-    </Dialog>
-  );
-}
 
 /* ─────────────────────────────────────────────────────────
    CINEMATIC MORE PROJECTS
@@ -1350,7 +1328,9 @@ function CinematicProjectsSection({
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
               <div key={project.id} className="relative h-72 overflow-hidden rounded-2xl border border-white/10 bg-[#0f1117]">
-                <img src={project.image.src} alt={project.image.alt} className="absolute inset-0 h-full w-full object-cover opacity-40" />
+                {project.image.src && (
+                  <Image src={project.image.src} alt={project.image.alt} fill sizes="(max-width: 1024px) 100vw, 760px" className="object-cover opacity-40" />
+                )}
                 <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-6">
                   <h3 className="text-lg font-semibold text-white">{project.title}</h3>
                   <p className="mt-1 text-sm text-white/55 line-clamp-2">{project.desc}</p>
@@ -1386,10 +1366,12 @@ function CinematicProjectsSection({
                   transform: `rotate(${tileRotations[i % tileRotations.length]}deg)`,
                 }}
               >
-                <img
+                <Image
                   src={img.src}
                   alt={img.alt}
-                  className="absolute inset-0 h-full w-full object-cover"
+                  fill
+                  sizes="(max-width: 768px) 45vw, 240px"
+                  className="object-cover"
                   style={{ opacity: 0.75 }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/15" />
@@ -1424,10 +1406,12 @@ function CinematicProjectsSection({
                   transform: `rotate(${-tileRotations[i % tileRotations.length]}deg)`,
                 }}
               >
-                <img
+                <Image
                   src={img.src}
                   alt={img.alt}
-                  className="absolute inset-0 h-full w-full object-cover"
+                  fill
+                  sizes="(max-width: 768px) 45vw, 240px"
+                  className="object-cover"
                   style={{ opacity: 0.75 }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/15" />
@@ -1459,11 +1443,15 @@ function CinematicProjectsSection({
               className="absolute w-[85vw] max-w-[680px] rounded-2xl overflow-hidden border border-white/10 bg-[#0f1117]"
               style={{ height: 'clamp(320px, 72vh, 600px)', zIndex: projects.length - i }}
             >
-              <img
-                src={project.image.src}
-                alt={project.image.alt}
-                className="absolute inset-0 h-full w-full object-cover opacity-40"
-              />
+              {project.image.src && (
+                <Image
+                  src={project.image.src}
+                  alt={project.image.alt}
+                  fill
+                  sizes="(max-width: 1024px) 90vw, 33vw"
+                  className="object-cover opacity-40"
+                />
+              )}
               <div className="absolute inset-0 flex flex-col justify-end p-6 sm:p-8 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
                 <span className="text-xs text-white/40 mb-2 tracking-widest uppercase">{project.category}</span>
                 <h3 className="text-2xl sm:text-3xl font-semibold text-white mb-2">{project.title}</h3>
@@ -1498,11 +1486,15 @@ function CinematicProjectsSection({
                   transition={{ type: 'spring', stiffness: 160, damping: 28 }}
                   className="absolute inset-0 rounded-2xl overflow-hidden border border-white/10 bg-[#0f1117]"
                 >
-                  <img
-                    src={project.image.src}
-                    alt={project.image.alt}
-                    className="absolute inset-0 h-full w-full object-cover opacity-40"
-                  />
+                  {project.image.src && (
+                    <Image
+                      src={project.image.src}
+                      alt={project.image.alt}
+                      fill
+                      sizes="(max-width: 1024px) 90vw, 33vw"
+                      className="object-cover opacity-40"
+                    />
+                  )}
                   <div className="absolute inset-0 flex flex-col justify-end p-6 sm:p-8 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
                     <span className="text-xs text-white/40 mb-2 tracking-widest uppercase">{project.category}</span>
                     <h3 className="text-2xl sm:text-3xl font-semibold text-white mb-2">{project.title}</h3>
@@ -1534,8 +1526,8 @@ function CinematicProjectsSection({
 ───────────────────────────────────────────────────────── */
 const testimonialLayouts = [
   {
-    width: 'md:w-[20rem] lg:w-[23rem]',
-    position: 'md:left-[9%] md:top-[43%]',
+    width: 'w-[82vw] md:w-[20rem] lg:w-[23rem]',
+    position: 'left-[5%] top-[45%] md:left-[9%] md:top-[43%]',
     input: [0.02, 0.12, 0.26, 0.36],
     x: [0, -8, -18, -34],
     y: [80, 80, -170, -660],
@@ -1544,8 +1536,8 @@ const testimonialLayouts = [
     opacity: [1, 1, 1, 0],
   },
   {
-    width: 'md:w-[24rem] lg:w-[28rem]',
-    position: 'md:left-[32%] md:top-[42%]',
+    width: 'w-[84vw] md:w-[24rem] lg:w-[28rem]',
+    position: 'left-[8%] top-[44%] md:left-[32%] md:top-[42%]',
     input: [0.24, 0.34, 0.48, 0.58],
     x: [0, 10, 20, 34],
     y: [92, 76, -175, -680],
@@ -1554,8 +1546,8 @@ const testimonialLayouts = [
     opacity: [1, 1, 1, 0],
   },
   {
-    width: 'md:w-[21rem] lg:w-[25rem]',
-    position: 'md:right-[9%] md:top-[43%]',
+    width: 'w-[82vw] md:w-[21rem] lg:w-[25rem]',
+    position: 'left-[6%] top-[45%] md:left-auto md:right-[9%] md:top-[43%]',
     input: [0.46, 0.56, 0.7, 0.8],
     x: [0, -8, -22, -44],
     y: [112, 78, -170, -670],
@@ -1564,8 +1556,8 @@ const testimonialLayouts = [
     opacity: [1, 1, 1, 0],
   },
   {
-    width: 'md:w-[19rem] lg:w-[23rem]',
-    position: 'md:left-[41%] md:top-[48%]',
+    width: 'w-[80vw] md:w-[19rem] lg:w-[23rem]',
+    position: 'left-[10%] top-[47%] md:left-[41%] md:top-[48%]',
     input: [0.68, 0.76, 0.9, 1],
     x: [0, 12, -14, -38],
     y: [116, 80, -165, -650],
@@ -1596,26 +1588,45 @@ function interpolateTimeline(
 
 function CreativeProjectsSection({
   projects,
+  galleryImages,
   containerRef,
 }: {
   projects: Project[];
+  galleryImages: GalleryImage[];
   containerRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const sectionRef = useRef<HTMLElement | null>(null);
+  const expandedSectionRef = useRef<HTMLElement | null>(null);
   const [progress, setProgress] = useState(0);
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
+  const [showAllGallery, setShowAllGallery] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
-  const posterPairs = useMemo(() => {
-    const pool = projects.flatMap((p) => [
+  const galleryPool = useMemo(() => {
+    const fallbackPool = projects.flatMap((p) => [
       { src: p.image.src, alt: p.image.alt, title: p.title, sub: p.category },
       { src: p.processImage.src, alt: p.processImage.alt, title: p.category, sub: p.tags[0] ?? '' },
     ]);
-    const shifted = [...pool.slice(2), ...pool.slice(0, 2)];
-    return Array.from({ length: 12 }, (_, index) => ({
+    return galleryImages.length > 0 ? galleryImages : fallbackPool;
+  }, [galleryImages, projects]);
+
+  const initialGalleryCount = isMobileLayout ? 8 : 12;
+  const remainingGallery = galleryPool.slice(initialGalleryCount);
+
+  const posterPairs = useMemo(() => {
+    const visiblePool = galleryPool.slice(0, initialGalleryCount);
+    if (visiblePool.length === 0) return [];
+    const initialCount = isMobileLayout ? 8 : 12;
+    const paddedPool = visiblePool.length < initialCount
+      ? Array.from({ length: initialCount }, (_, index) => visiblePool[index % visiblePool.length])
+      : visiblePool;
+    const shifted = [...paddedPool.slice(2), ...paddedPool.slice(0, 2)];
+    const itemCount = paddedPool.length;
+    return Array.from({ length: itemCount }, (_, index) => ({
       initial: shifted[index % shifted.length],
       final: shifted[(index + 5) % shifted.length],
     }));
-  }, [projects]);
+  }, [galleryPool, initialGalleryCount, isMobileLayout]);
 
   useEffect(() => {
     const scroller = containerRef.current;
@@ -1644,6 +1655,32 @@ function CreativeProjectsSection({
     };
   }, [containerRef, prefersReducedMotion]);
 
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobileLayout(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!showAllGallery || !isMobileLayout) return;
+    const scroller = containerRef.current;
+    const expandedSection = expandedSectionRef.current;
+    if (!scroller || !expandedSection) return;
+
+    const frame = requestAnimationFrame(() => {
+      const revealOffset = Math.min(220, scroller.clientHeight * 0.25);
+      const previousScrollBehavior = scroller.style.scrollBehavior;
+      scroller.style.scrollBehavior = 'auto';
+      expandedSection.scrollIntoView({ block: 'start', behavior: 'auto' });
+      scroller.scrollTop = Math.max(0, scroller.scrollTop - revealOffset);
+      scroller.style.scrollBehavior = previousScrollBehavior;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [containerRef, isMobileLayout, showAllGallery]);
+
   const ease = progress * progress * (3 - 2 * progress);
   const entranceRaw = Math.min(1, Math.max(0, (ease + 0.16) / 0.3));
   const entrance = entranceRaw * entranceRaw * (3 - 2 * entranceRaw);
@@ -1651,9 +1688,14 @@ function CreativeProjectsSection({
   const fill = fillRaw * fillRaw * (3 - 2 * fillRaw);
   const headingOpacity = Math.max(0, 1 - fill * 1.25);
   const horizontalDrift = -24 + entrance * 24 + ease * 20;
+  const mobileWallPanRaw = Math.min(1, Math.max(0, (fill - 0.72) / 0.28));
+  const mobileWallPan = mobileWallPanRaw * mobileWallPanRaw * (3 - 2 * mobileWallPanRaw) * 38;
+  const galleryCount = galleryPool.length;
+  const canToggleGallery = galleryCount > initialGalleryCount;
 
   return (
-    <section ref={sectionRef} id="more-work" className="relative h-[218svh] bg-[#06080d]">
+    <>
+    <section ref={sectionRef} id="more-work" className="relative h-[320svh] bg-[#06080d] md:h-[218svh]">
       <div className="sticky top-0 h-screen overflow-hidden bg-black">
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_45%_30%_at_50%_50%,rgba(255,255,255,0.06),transparent_74%)]" />
 
@@ -1664,29 +1706,40 @@ function CreativeProjectsSection({
             transform: `translate3d(0, calc(-50% + ${(-fill * 28).toFixed(2)}px), 0)`,
           }}
         >
-          <h2 className="text-balance text-5xl font-light leading-[0.92] tracking-[-0.06em] text-white sm:text-7xl">
-            Unleash your creative power
-          </h2>
+          <CreativeHeadingReveal />
         </div>
 
         <div className="absolute inset-0 z-10">
           {posterPairs.map((pair, index) => {
-            const isTopBand = index < 6;
-            const bandIndex = index % 6;
-            const finalCol = index % 4;
-            const finalRow = Math.floor(index / 4);
-            const rowEnter = (isTopBand ? -42 : 42) * (1 - entrance);
+            const bandSize = isMobileLayout ? Math.ceil(posterPairs.length / 2) : 6;
+            const isTopBand = index < bandSize;
+            const bandIndex = index % bandSize;
+            const finalColumns = isMobileLayout ? 2 : 4;
+            const finalRows = Math.ceil(posterPairs.length / finalColumns);
+            const finalCol = index % finalColumns;
+            const finalRow = Math.floor(index / finalColumns);
+            const rowTravel = isMobileLayout ? 22 : 34;
+            const rowEnter = (isTopBand ? -rowTravel : rowTravel) * (1 - entrance);
             const movingGap = 0.42 * (1 - fill);
             const revealColGap = 0.12 * fill;
-            const revealRowGap = 4.1 * fill;
-            const initialX = -9 + bandIndex * (19.7 + movingGap) + horizontalDrift + (isTopBand ? 0 : -7);
-            const initialY = (isTopBand ? 10 : 56) + rowEnter;
-            const finalX = 4.5 + finalCol * (23.05 + revealColGap);
-            const finalY = 3.8 + finalRow * (31 + revealRowGap);
+            const revealRowGap = finalRows > 3 ? 1.6 * fill : 4.1 * fill;
+            const initialX = isMobileLayout
+              ? -8 + bandIndex * (46 + movingGap * 8) + horizontalDrift * 0.42 + (isTopBand ? 0 : -10)
+              : -9 + bandIndex * (19.7 + movingGap) + horizontalDrift + (isTopBand ? 0 : -7);
+            const initialY = (isTopBand ? (isMobileLayout ? 24 : 10) : (isMobileLayout ? 54 : 56)) + rowEnter;
+            const finalX = isMobileLayout ? 6.5 + finalCol * 46 : 4.5 + finalCol * (23.05 + revealColGap);
+            const mobileWallPanDistance = isMobileLayout && finalRows > 4 ? mobileWallPan : 0;
+            const finalY = isMobileLayout
+              ? 4.5 + finalRow * Math.max(14, 84 / finalRows) - mobileWallPanDistance
+              : 3.8 + finalRow * ((88 / finalRows) + revealRowGap);
             const x = initialX + (finalX - initialX) * fill;
             const y = initialY + (finalY - initialY) * fill;
             const scale = 0.98 + fill * 0.08;
-            const opacity = 0.08 + entrance * 0.66 + fill * 0.26;
+            const opacity = isMobileLayout ? 0.34 + entrance * 0.42 + fill * 0.2 : 0.08 + entrance * 0.66 + fill * 0.26;
+            const tileWidth = isMobileLayout ? 'clamp(8rem, 41vw, 11rem)' : 'clamp(12rem, 20vw, 23rem)';
+            const tileHeight = isMobileLayout
+              ? finalRows > 4 ? 'clamp(5.4rem, 12vh, 7rem)' : 'clamp(5.8rem, 13.5vh, 7.4rem)'
+              : finalRows > 3 ? 'clamp(9.6rem, 22vh, 16.5rem)' : 'clamp(10rem, 24vh, 14rem)';
             return (
               <div
                 key={`${pair.initial.title}-${index}`}
@@ -1694,8 +1747,8 @@ function CreativeProjectsSection({
                 style={{
                   left: `${x.toFixed(3)}%`,
                   top: `${y.toFixed(3)}%`,
-                  width: 'clamp(12rem, 20vw, 23rem)',
-                  height: 'clamp(15rem, 32vh, 23rem)',
+                  width: tileWidth,
+                  height: tileHeight,
                   opacity,
                   transform: `translate3d(0, 0, 0) scale(${scale.toFixed(4)})`,
                 }}
@@ -1710,8 +1763,53 @@ function CreativeProjectsSection({
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-32 bg-gradient-to-t from-[#06080d] via-black/78 to-transparent" />
         <div className="pointer-events-none absolute inset-y-0 left-0 z-40 w-28 bg-gradient-to-r from-black to-transparent" />
         <div className="pointer-events-none absolute inset-y-0 right-0 z-40 w-28 bg-gradient-to-l from-black to-transparent" />
+        {canToggleGallery && !showAllGallery && (
+          <button
+            type="button"
+            onClick={() => setShowAllGallery(true)}
+            className="absolute bottom-7 left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/35 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/72 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/8 hover:text-white"
+            style={{ opacity: Math.max(0.24, fill) }}
+          >
+            Show more ({galleryCount - initialGalleryCount})
+            <ArrowDown className="size-3" />
+          </button>
+        )}
       </div>
     </section>
+    {showAllGallery && remainingGallery.length > 0 && (
+      <section ref={expandedSectionRef} className="relative z-20 -mt-[clamp(3.75rem,13vh,7rem)] bg-[#06080d] pb-20 pt-0 md:mt-0 md:pb-24">
+        <div className="mx-auto w-[94vw] pt-0 md:w-[92vw] md:pt-5 lg:w-[92.2vw]">
+          <div
+            className="grid grid-cols-2 gap-x-3 gap-y-3.5 sm:gap-x-4 md:gap-y-5 lg:gap-x-[clamp(2rem,2.75vw,3.5rem)]"
+            style={{
+              gridTemplateColumns: isMobileLayout ? undefined : 'repeat(4, minmax(0, 1fr))',
+            }}
+          >
+            {remainingGallery.map((image, index) => (
+              <ExpandedGalleryTile key={`${image.src}-${index}`} image={image} />
+            ))}
+          </div>
+          <div className="mt-7 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowAllGallery(false)}
+              className="rounded-full border border-white/12 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55 transition hover:border-white/28 hover:text-white"
+            >
+              Show less
+            </button>
+          </div>
+        </div>
+      </section>
+    )}
+    </>
+  );
+}
+
+function ExpandedGalleryTile({ image }: { image: GalleryImage }) {
+  return (
+    <div className="h-[clamp(6.15rem,14.25vh,7.85rem)] md:h-[clamp(10rem,25.5vh,14.4rem)]">
+      <CreativeMorphPoster initial={image} final={image} index={0} progress={0} />
+    </div>
   );
 }
 
@@ -1721,44 +1819,132 @@ function CreativeMorphPoster({
   index,
   progress,
 }: {
-  initial: { src: string; alt: string; title: string; sub: string };
-  final: { src: string; alt: string; title: string; sub: string };
+  initial: GalleryImage;
+  final: GalleryImage;
   index: number;
   progress: number;
 }) {
-  return (
-    <div
-      className="relative size-full overflow-hidden rounded-2xl bg-[#0e1118] shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
-      style={{ transform: `translateY(${(index % 2) * 5}px)` }}
-    >
-      <img
+  const active = progress > 0.5 ? final : initial;
+  const isExternalLink = active.link ? !active.link.startsWith('/') : false;
+  const content = (
+    <>
+      {active.link && (
+        <span className="absolute right-1.5 top-1.5 z-20 inline-flex size-6 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white opacity-100 backdrop-blur-md transition duration-300 md:right-3 md:top-3 md:size-9 md:opacity-0 md:group-hover:translate-x-0.5 md:group-hover:-translate-y-0.5 md:group-hover:opacity-100">
+          <ArrowUpRight className="size-3 md:size-4" />
+        </span>
+      )}
+      <Image
         src={initial.src}
         alt={initial.alt}
+        fill
+        sizes="(max-width: 768px) 45vw, 190px"
         onError={(event) => {
           event.currentTarget.style.display = 'none';
         }}
-        className="absolute inset-0 size-full object-cover text-[0px] text-transparent"
+        className="object-cover text-[0px] text-transparent transition duration-300 group-hover:scale-[1.035]"
         style={{ opacity: 1 - progress }}
       />
-      <img
+      <Image
         src={final.src}
         alt={final.alt}
+        fill
+        sizes="(max-width: 768px) 45vw, 190px"
         onError={(event) => {
           event.currentTarget.style.display = 'none';
         }}
-        className="absolute inset-0 size-full object-cover text-[0px] text-transparent"
+        className="object-cover text-[0px] text-transparent transition duration-300 group-hover:scale-[1.035]"
         style={{ opacity: progress }}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/8 to-black/10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/54 via-black/0 to-black/4 md:from-black/70 md:via-black/8 md:to-black/10" />
       <div className="absolute inset-x-0 bottom-0 p-3">
         <div className="line-clamp-1 text-xs font-semibold tracking-[-0.02em] text-white/88">
-          {progress > 0.5 ? final.title : initial.title}
+          {active.title}
         </div>
         <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/42">
-          {progress > 0.5 ? final.sub : initial.sub}
+          {active.sub}
         </div>
       </div>
+    </>
+  );
+
+  const className =
+    'group relative block size-full overflow-hidden rounded-2xl bg-[#0e1118] shadow-[0_24px_80px_rgba(0,0,0,0.42)]';
+
+  if (active.link) {
+    return (
+      <a
+        href={active.link}
+        target={isExternalLink ? '_blank' : undefined}
+        rel={isExternalLink ? 'noreferrer' : undefined}
+        className={className}
+        style={{ transform: `translateY(${(index % 2) * 5}px)` }}
+        aria-label={`Open ${active.title}`}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div
+      className={className}
+      style={{ transform: `translateY(${(index % 2) * 5}px)` }}
+    >
+      {content}
     </div>
+  );
+}
+
+function CreativeHeadingReveal() {
+  const words = ['Crafted', 'with', 'real', 'intent'];
+
+  return (
+    <motion.h2
+      aria-label="Crafted with real intent"
+      className="text-balance text-5xl font-light leading-[0.92] tracking-[-0.06em] text-white sm:text-7xl"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: false, amount: 0.78 }}
+      variants={{
+        hidden: {},
+        show: {
+          transition: {
+            staggerChildren: 0.09,
+            delayChildren: 0.04,
+          },
+        },
+      }}
+    >
+      {words.map((word, index) => {
+        return (
+          <span key={word} className="inline-block overflow-hidden pr-[0.12em] pb-[0.04em] align-bottom">
+            <motion.span
+              className="inline-block will-change-[opacity,transform,filter]"
+              variants={{
+                hidden: {
+                  opacity: 0,
+                  y: 54,
+                  filter: 'blur(14px)',
+                  color: 'rgba(255,255,255,0.42)',
+                },
+                show: {
+                  opacity: 1,
+                  y: 0,
+                  filter: 'blur(0px)',
+                  color: 'rgba(255,255,255,1)',
+                  transition: {
+                    duration: 0.82,
+                    ease: [0.16, 1, 0.3, 1],
+                  },
+                },
+              }}
+            >
+              {word}
+            </motion.span>
+          </span>
+        );
+      })}
+    </motion.h2>
   );
 }
 
@@ -1838,13 +2024,15 @@ function CreativeTile({
         transform: grid ? 'none' : `rotate(${rotations[index % rotations.length]}deg)`,
       }}
     >
-      <img
+      <Image
         src={item.src}
         alt={item.alt}
+        fill
+        sizes="(max-width: 768px) 45vw, 220px"
         onError={(event) => {
           event.currentTarget.style.display = 'none';
         }}
-        className="absolute inset-0 size-full object-cover text-[0px] text-transparent opacity-75"
+        className="object-cover text-[0px] text-transparent opacity-75"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-black/12 to-black/18" />
       <div className="absolute inset-x-0 bottom-0 p-3">
@@ -1870,7 +2058,7 @@ function TestimonialsSection({
     offset: ['start start', 'end end'],
   });
   return (
-    <section id="testimonials" className="relative overflow-hidden bg-[#06080d] py-24 lg:py-32">
+    <section className="relative overflow-hidden bg-[#06080d] py-24 lg:py-32">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-[1]"
@@ -2023,7 +2211,7 @@ function StickyTestimonialsSection({
     <section
       ref={sectionRef}
       id="testimonials"
-      className="testimonial-stage relative min-h-screen bg-[#06080d] md:h-[320svh]"
+      className="testimonial-stage relative h-[320svh] bg-[#06080d]"
     >
       <div className="sticky top-0 h-screen overflow-hidden">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1]">
@@ -2049,7 +2237,7 @@ function StickyTestimonialsSection({
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-0 z-10 hidden md:block">
+        <div className="pointer-events-none absolute inset-0 z-10">
           <div className="relative mx-auto h-screen max-w-7xl px-5 sm:px-8 lg:px-10">
             {testimonials.map((testimonial, index) => (
               <FloatingTestimonialCard
@@ -2064,25 +2252,6 @@ function StickyTestimonialsSection({
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-5 pb-20 sm:px-8 md:hidden">
-        <div className="mb-8 pt-[55vh]">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--accent)] backdrop-blur-md">
-            <span className="size-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_10px_currentColor]" />
-            Testimonials
-          </div>
-          <h2 className="max-w-xl text-balance text-4xl font-light tracking-[-0.055em] text-white sm:text-5xl">
-            <span className="font-serif italic text-white/55">Hear from clients</span>
-            <br />
-            I&apos;ve worked with
-          </h2>
-        </div>
-
-        <div className="grid gap-4">
-          {testimonials.map((testimonial) => (
-            <TestimonialCard key={testimonial.name} testimonial={testimonial} />
-          ))}
-        </div>
-      </div>
     </section>
   );
 }
@@ -2180,20 +2349,39 @@ function TestimonialCard({ testimonial }: { testimonial: PortfolioContent['testi
 function ContactSection() {
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
   const isValid =
     form.name.trim().length > 1 &&
     form.email.trim().includes('@') &&
     form.email.trim().includes('.') &&
     form.message.trim().length > 3;
 
-  const submit = (event: React.SyntheticEvent<HTMLFormElement>) => {
+  const submit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!isValid) return;
-    setSent(true);
+    if (!isValid || sending) return;
+    setSending(true);
+    setError('');
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        setSent(true);
+      } else {
+        setError('Something went wrong. Please try again or email me directly.');
+      }
+    } catch {
+      setError('Network error. Please try again or email me directly.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
-    <section id="contact" className="relative mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:px-10 lg:py-32">
+    <section id="contact" className="relative mx-auto max-w-7xl scroll-mt-20 px-5 py-24 sm:px-8 lg:px-10 lg:py-32">
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -2254,47 +2442,54 @@ function ContactSection() {
           transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
           className="grid gap-5"
         >
-          {sent ? (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex min-h-[360px] flex-col items-start justify-center rounded-[28px] border border-[rgba(var(--accent-rgb),0.28)] bg-[rgba(var(--accent-rgb),0.09)] p-8"
-            >
-              <Check className="mb-6 size-10 text-[var(--accent)]" />
-              <h3 className="text-4xl font-light tracking-[-0.05em]">Message queued.</h3>
-              <p className="mt-4 max-w-md text-sm leading-7 text-white/58">
-                Thanks. I&apos;ll get back to you within 24 hours with next steps.
-              </p>
-            </motion.div>
-          ) : (
-            <>
-              <ContactInput
-                label="Full name"
-                value={form.name}
-                onChange={(v) => setForm((c) => ({ ...c, name: v }))}
-              />
-              <ContactInput
-                label="Email address"
-                type="email"
-                value={form.email}
-                onChange={(v) => setForm((c) => ({ ...c, email: v }))}
-              />
-              <label className="grid gap-2">
-                <span className="text-[10px] uppercase tracking-[0.18em] text-white/42">Project notes</span>
-                <textarea
-                  value={form.message}
-                  onChange={(e) => setForm((c) => ({ ...c, message: e.target.value }))}
-                  rows={5}
-                  className="min-h-36 resize-y rounded-3xl border border-white/10 bg-black/20 px-5 py-4 text-sm text-white outline-none transition placeholder:text-white/24 focus:border-[rgba(var(--accent-rgb),0.55)]"
-                  placeholder="Tell me about the build, timeline, goals, and constraints."
+          <div aria-live="polite" aria-atomic="true" className="grid gap-5">
+            {sent ? (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex min-h-[360px] flex-col items-start justify-center rounded-[28px] border border-[rgba(var(--accent-rgb),0.28)] bg-[rgba(var(--accent-rgb),0.09)] p-8"
+              >
+                <Check className="mb-6 size-10 text-[var(--accent)]" />
+                <h3 className="text-4xl font-light tracking-[-0.05em]">Message sent.</h3>
+                <p className="mt-4 max-w-md text-sm leading-7 text-white/70">
+                  Thanks. I&apos;ll get back to you within 24 hours with next steps.
+                </p>
+              </motion.div>
+            ) : (
+              <>
+                <ContactInput
+                  label="Full name"
+                  value={form.name}
+                  onChange={(v) => setForm((c) => ({ ...c, name: v }))}
                 />
-              </label>
-              <Button type="submit" disabled={!isValid} className="mt-2 w-full sm:w-max">
-                Send message
-                <Send className="size-4" />
-              </Button>
-            </>
-          )}
+                <ContactInput
+                  label="Email address"
+                  type="email"
+                  value={form.email}
+                  onChange={(v) => setForm((c) => ({ ...c, email: v }))}
+                />
+                <label className="grid gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-white/42">Project notes</span>
+                  <textarea
+                    value={form.message}
+                    onChange={(e) => setForm((c) => ({ ...c, message: e.target.value }))}
+                    rows={5}
+                    className="min-h-36 resize-y rounded-3xl border border-white/10 bg-black/20 px-6 py-5 text-sm text-white outline-none transition placeholder:text-white/24 focus:border-[rgba(var(--accent-rgb),0.55)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--accent-rgb),0.55)]"
+                    placeholder="Tell me about the build, timeline, goals, and constraints."
+                  />
+                </label>
+                {error && (
+                  <p className="text-sm text-red-400/90" role="alert">
+                    {error}
+                  </p>
+                )}
+                <Button type="submit" disabled={!isValid || sending} className="mt-2 w-full sm:w-max">
+                  {sending ? 'Sending…' : 'Send message'}
+                  {!sending && <Send className="size-4" />}
+                </Button>
+              </>
+            )}
+          </div>
         </motion.form>
       </motion.div>
     </section>
@@ -2319,7 +2514,7 @@ function ContactInput({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-14 rounded-full border border-white/10 bg-black/20 px-5 text-sm text-white outline-none transition placeholder:text-white/24 focus:border-[rgba(var(--accent-rgb),0.55)]"
+        className="h-14 rounded-full border border-white/10 bg-black/20 px-7 text-sm text-white outline-none transition placeholder:text-white/24 focus:border-[rgba(var(--accent-rgb),0.55)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--accent-rgb),0.55)]"
         placeholder={label}
       />
     </label>
@@ -2332,7 +2527,7 @@ function ContactInput({
 function Footer() {
   return (
     <footer className="mx-auto flex max-w-7xl flex-col gap-3 border-t border-white/10 px-5 py-8 text-[10px] uppercase tracking-[0.18em] text-white/32 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-      <span>© 2026 Shoaib Qureshi / Bengaluru, India</span>
+      <span>© {new Date().getFullYear()} Shoaib Qureshi / Bengaluru, India</span>
       <span>Designed and built with cinematic restraint</span>
     </footer>
   );

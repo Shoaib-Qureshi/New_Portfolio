@@ -32,7 +32,10 @@ export function SplineWorkScene() {
       app.start(scene, { interactive: false });
       if (disposed) return;
 
-      app.setBackgroundColor?.('rgba(0,0,0,0)');
+      // Opaque black clear colour (no alpha) — THREE.Color ignores alpha and
+      // warns on rgba(...,0). Under the canvas' `mix-blend-mode: lighten`, black
+      // contributes nothing, so the scene still reads as transparent.
+      app.setBackgroundColor?.('#000000');
       app.setZoom?.(prefersReduced ? 0.94 : 1.08);
       setReady(true);
     };

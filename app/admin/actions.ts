@@ -13,7 +13,7 @@ import {
   savePortfolioContent,
   saveProjects,
 } from '@/lib/content-store';
-import type { CaseStudyHighlight, CaseStudyPhase, Project, ProjectIconKey } from '@/lib/content-types';
+import type { CaseStudyHighlight, CaseStudyPhase, GalleryImage, Project, ProjectIconKey } from '@/lib/content-types';
 
 function field(formData: FormData, name: string, fallback = '') {
   return String(formData.get(name) ?? fallback).trim();
@@ -68,6 +68,40 @@ function parseProcess(value: string): CaseStudyPhase[] {
   });
 }
 
+function parseGalleryImages(value: string): GalleryImage[] {
+  return lines(value)
+    .map((line) => {
+      const [src = '', alt = '', title = '', sub = '', link = ''] = line.split('|').map((part) => part.trim());
+      return {
+        src,
+        alt: alt || title || 'Gallery image',
+        title: title || alt || 'Gallery image',
+        sub,
+        link: link || undefined,
+      };
+    })
+    .filter((image) => image.src);
+}
+
+function galleryImagesFromFields(formData: FormData): GalleryImage[] {
+  const count = Number(field(formData, 'galleryImageCount', '0'));
+  if (!Number.isFinite(count) || count < 1) return parseGalleryImages(field(formData, 'galleryImages'));
+
+  const images: GalleryImage[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const src = field(formData, `gallerySrc_${index}`);
+    const title = field(formData, `galleryTitle_${index}`, 'Gallery image');
+    const alt = field(formData, `galleryAlt_${index}`, title);
+    const sub = field(formData, `gallerySub_${index}`);
+    const link = field(formData, `galleryLink_${index}`);
+    const remove = field(formData, `galleryRemove_${index}`) === 'yes';
+    if (!remove && src) {
+      images.push({ src, alt: alt || title, title: title || alt || 'Gallery image', sub, link: link || undefined });
+    }
+  }
+  return images;
+}
+
 async function saveImage(file: FormDataEntryValue | null) {
   if (!(file instanceof File) || file.size === 0) return null;
   if (!file.type.startsWith('image/')) throw new Error('Only image uploads are allowed.');
@@ -89,6 +123,22 @@ async function saveImage(file: FormDataEntryValue | null) {
   return publicPath;
 }
 
+async function saveGalleryUploads(files: FormDataEntryValue[]): Promise<GalleryImage[]> {
+  const images: GalleryImage[] = [];
+  for (const file of files) {
+    const publicPath = await saveImage(file);
+    if (!publicPath || !(file instanceof File)) continue;
+    const title = path.basename(file.name, path.extname(file.name)).replace(/[-_]+/g, ' ').trim() || 'Gallery image';
+    images.push({
+      src: publicPath,
+      alt: title,
+      title,
+      sub: 'Uploaded',
+    });
+  }
+  return images;
+}
+
 async function projectFromForm(formData: FormData, existing?: Project): Promise<Project> {
   const content = getPortfolioContent();
   const title = field(formData, 'title', existing?.title ?? 'Untitled Project');
@@ -105,6 +155,8 @@ async function projectFromForm(formData: FormData, existing?: Project): Promise<
     color: field(formData, 'color', existing?.color ?? '#F5F5F5'),
     desc: field(formData, 'desc', existing?.desc ?? ''),
     year: field(formData, 'year', existing?.year ?? new Date().getFullYear().toString()),
+    showYear: formData.get('showYear') === 'true',
+    customIcon: field(formData, 'customIcon', existing?.customIcon ?? '') || undefined,
     role: field(formData, 'role', existing?.role ?? ''),
     impact: field(formData, 'impact', existing?.impact ?? ''),
     iconKey: field(formData, 'iconKey', existing?.iconKey ?? 'workflow') as ProjectIconKey,
@@ -173,10 +225,28 @@ export async function deleteProjectAction(formData: FormData) {
   redirect('/admin');
 }
 
+const TOGGLEABLE_SECTIONS = ['testimonials', 'work', 'about', 'contact'];
+
+export async function saveSiteSettingsAction(formData: FormData) {
+  const content = getPortfolioContent();
+  // Checkboxes submit their value only when checked. Checked = visible.
+  const visibleSections = formData.getAll('visibleSections').map(String);
+  const visibleProjects = formData.getAll('visibleProjects').map(String);
+  const hiddenSections = TOGGLEABLE_SECTIONS.filter((id) => !visibleSections.includes(id));
+  const hiddenProjects = content.projects.map((p) => p.id).filter((id) => !visibleProjects.includes(id));
+  savePortfolioContent({ ...content, siteSettings: { hiddenSections, hiddenProjects } });
+  refreshPublicPages();
+  redirect('/admin#site-settings');
+}
+
 export async function saveSharedContentAction(formData: FormData) {
   const content = getPortfolioContent();
   savePortfolioContent({
     ...content,
+    galleryImages: [
+      ...galleryImagesFromFields(formData),
+      ...(await saveGalleryUploads(formData.getAll('galleryImageFiles'))),
+    ],
     skills: lines(field(formData, 'skills')),
     marquee: lines(field(formData, 'marquee')),
     timeline: lines(field(formData, 'timeline')).map((line) => {
