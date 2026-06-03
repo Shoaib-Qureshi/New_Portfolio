@@ -1700,6 +1700,7 @@ function CreativeProjectsSection({
           className="pointer-events-none absolute inset-x-0 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center justify-center px-5 text-center"
           style={{
             opacity: headingOpacity,
+            willChange: 'transform, opacity',
             transform: `translate3d(0, calc(-50% + ${(-fill * 28).toFixed(2)}px), 0)`,
           }}
         >
@@ -1707,12 +1708,14 @@ function CreativeProjectsSection({
         </div>
 
         <div className="absolute inset-0 z-10">
-          {posterPairs.map((pair, index) => {
-            const bandSize = isMobileLayout ? Math.ceil(posterPairs.length / 2) : 6;
+          {/* On mobile cap at 4 tiles — halves layout/composite work per frame */}
+          {(isMobileLayout ? posterPairs.slice(0, 4) : posterPairs).map((pair, index) => {
+            const activePairs = isMobileLayout ? Math.min(4, posterPairs.length) : posterPairs.length;
+            const bandSize = isMobileLayout ? Math.ceil(activePairs / 2) : 6;
             const isTopBand = index < bandSize;
             const bandIndex = index % bandSize;
             const finalColumns = isMobileLayout ? 2 : 4;
-            const finalRows = Math.ceil(posterPairs.length / finalColumns);
+            const finalRows = Math.ceil(activePairs / finalColumns);
             const finalCol = index % finalColumns;
             const finalRow = Math.floor(index / finalColumns);
             const rowTravel = isMobileLayout ? 22 : 34;
@@ -1729,8 +1732,14 @@ function CreativeProjectsSection({
             const finalY = isMobileLayout
               ? 4.5 + finalRow * Math.max(14, 84 / finalRows) - mobileWallPanDistance
               : 3.8 + finalRow * ((88 / finalRows) + revealRowGap);
-            const x = initialX + (finalX - initialX) * fill;
-            const y = initialY + (finalY - initialY) * fill;
+            // x/y are % of container (= 100vw × 100vh). Convert to px so positioning
+            // lives entirely in transform (GPU compositing) instead of left/top (layout).
+            const iw = typeof window !== 'undefined' ? window.innerWidth : 0;
+            const ih = typeof window !== 'undefined' ? window.innerHeight : 0;
+            const xPct = initialX + (finalX - initialX) * fill;
+            const yPct = initialY + (finalY - initialY) * fill;
+            const xPx = (xPct / 100 * iw).toFixed(1);
+            const yPx = (yPct / 100 * ih).toFixed(1);
             const scale = 0.98 + fill * 0.08;
             const opacity = isMobileLayout ? 0.34 + entrance * 0.42 + fill * 0.2 : 0.08 + entrance * 0.66 + fill * 0.26;
             const tileWidth = isMobileLayout ? 'clamp(8rem, 41vw, 11rem)' : 'clamp(12rem, 20vw, 23rem)';
@@ -1740,14 +1749,15 @@ function CreativeProjectsSection({
             return (
               <div
                 key={`${pair.initial.title}-${index}`}
-                className="absolute"
                 style={{
-                  left: `${x.toFixed(3)}%`,
-                  top: `${y.toFixed(3)}%`,
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
                   width: tileWidth,
                   height: tileHeight,
                   opacity,
-                  transform: `translate3d(0, 0, 0) scale(${scale.toFixed(4)})`,
+                  willChange: 'transform, opacity',
+                  transform: `translate3d(${xPx}px, ${yPx}px, 0) scale(${scale.toFixed(4)})`,
                 }}
               >
                 <CreativeMorphPoster initial={pair.initial} final={pair.final} index={index} progress={fill} />
