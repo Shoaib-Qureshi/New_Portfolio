@@ -13,7 +13,7 @@ import {
 } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ArrowDown, ArrowUpRight, Check, ChevronRight, Code2, Filter, Mail, Menu, Send, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronRight, Code2, Filter, Mail, Menu, Send, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -266,12 +266,13 @@ function FloatingNav({
             </button>
           ))}
         </div>
-        <div className="hidden md:block">
-          <Button variant="outline" size="sm" onClick={() => onNavigate('contact')}>
-            Let&apos;s connect
-            <ArrowUpRight className="size-3.5" />
-          </Button>
-        </div>
+        <button
+          onClick={() => onNavigate('contact')}
+          className="glass hidden cursor-pointer items-center gap-2 rounded-full px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/65 transition hover:text-white md:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        >
+          Let&apos;s connect
+          <ArrowUpRight className="size-3.5" />
+        </button>
         <button
           className="inline-flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white md:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -827,7 +828,7 @@ function AboutSection({
                     ['4+', 'Years experience'],
                     ['25+', 'Projects shipped'],
                   ].map(([value, label]) => (
-                    <div key={label} className="glass rounded-3xl p-3.5 md:p-5">
+                    <div key={label} className="glass rounded-3xl p-3.5 md:p-5 [isolation:isolate] [will-change:transform]" style={{ transform: 'translateZ(0)' }}>
                       <div className="text-3xl font-light tracking-[-0.06em] text-white md:text-4xl">{value}</div>
                       <div className="mt-1.5 text-[9px] uppercase tracking-[0.18em] text-white/42 md:mt-2 md:text-[10px]">{label}</div>
                     </div>
@@ -855,16 +856,26 @@ function AboutSection({
                   className="absolute inset-x-0 top-0"
                 />
                 </div>
-                <div className="mt-2 flex max-h-[7.4rem] flex-wrap gap-2 overflow-hidden md:mt-8 md:max-h-none">
+                <motion.div
+                  className="mt-2 flex max-h-[7.4rem] flex-wrap gap-2 overflow-hidden md:mt-8 md:max-h-none"
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, amount: 0.25 }}
+                  variants={{ show: { transition: { staggerChildren: 0.045, delayChildren: 0.1 } } }}
+                >
                   {skills.map((skill) => (
-                    <span
+                    <motion.span
                       key={skill}
+                      variants={{
+                        hidden: { opacity: 0, scale: 0.82, y: 10 },
+                        show: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } },
+                      }}
                       className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/46"
                     >
                       {skill}
-                    </span>
+                    </motion.span>
                   ))}
-                </div>
+                </motion.div>
               </div>
             </div>
           </div>
@@ -1670,7 +1681,7 @@ function CreativeProjectsSection({
     if (!scroller || !expandedSection) return;
 
     const frame = requestAnimationFrame(() => {
-      const revealOffset = Math.min(220, scroller.clientHeight * 0.25);
+      const revealOffset = Math.min(100, scroller.clientHeight * 0.13);
       const targetTop = expandedSection.offsetTop - revealOffset;
       scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
     });
@@ -1708,9 +1719,9 @@ function CreativeProjectsSection({
         </div>
 
         <div className="absolute inset-0 z-10">
-          {/* On mobile cap at 4 tiles — halves layout/composite work per frame */}
-          {(isMobileLayout ? posterPairs.slice(0, 4) : posterPairs).map((pair, index) => {
-            const activePairs = isMobileLayout ? Math.min(4, posterPairs.length) : posterPairs.length;
+          {/* On mobile cap at 6 tiles — reduces layout/composite work per frame */}
+          {(isMobileLayout ? posterPairs.slice(0, 6) : posterPairs).map((pair, index) => {
+            const activePairs = isMobileLayout ? Math.min(6, posterPairs.length) : posterPairs.length;
             const bandSize = isMobileLayout ? Math.ceil(activePairs / 2) : 6;
             const isTopBand = index < bandSize;
             const bandIndex = index % bandSize;
@@ -1727,37 +1738,32 @@ function CreativeProjectsSection({
               ? -8 + bandIndex * (46 + movingGap * 8) + horizontalDrift * 0.42 + (isTopBand ? 0 : -10)
               : -9 + bandIndex * (19.7 + movingGap) + horizontalDrift + (isTopBand ? 0 : -7);
             const initialY = (isTopBand ? (isMobileLayout ? 24 : 10) : (isMobileLayout ? 54 : 56)) + rowEnter;
-            const finalX = isMobileLayout ? 6.5 + finalCol * 46 : 4.5 + finalCol * (23.05 + revealColGap);
+            const finalX = isMobileLayout ? 2.2 + finalCol * 50.25 : 4.5 + finalCol * (23.05 + revealColGap);
             const mobileWallPanDistance = isMobileLayout && finalRows > 4 ? mobileWallPan : 0;
             const finalY = isMobileLayout
-              ? 4.5 + finalRow * Math.max(14, 84 / finalRows) - mobileWallPanDistance
+              ? 7 + finalRow * (finalRows > 2 ? 20 : 42) - mobileWallPanDistance
               : 3.8 + finalRow * ((88 / finalRows) + revealRowGap);
-            // x/y are % of container (= 100vw × 100vh). Convert to px so positioning
-            // lives entirely in transform (GPU compositing) instead of left/top (layout).
-            const iw = typeof window !== 'undefined' ? window.innerWidth : 0;
-            const ih = typeof window !== 'undefined' ? window.innerHeight : 0;
-            const xPct = initialX + (finalX - initialX) * fill;
-            const yPct = initialY + (finalY - initialY) * fill;
-            const xPx = (xPct / 100 * iw).toFixed(1);
-            const yPx = (yPct / 100 * ih).toFixed(1);
-            const scale = 0.98 + fill * 0.08;
+            const positionFill = isMobileLayout ? Math.min(1, fill * 1.08) : fill;
+            const x = initialX + (finalX - initialX) * positionFill;
+            const y = initialY + (finalY - initialY) * positionFill;
+            const scale = isMobileLayout ? 1 : 0.98 + fill * 0.08;
             const opacity = isMobileLayout ? 0.34 + entrance * 0.42 + fill * 0.2 : 0.08 + entrance * 0.66 + fill * 0.26;
-            const tileWidth = isMobileLayout ? 'clamp(8rem, 41vw, 11rem)' : 'clamp(12rem, 20vw, 23rem)';
+            const tileWidth = isMobileLayout ? 'calc((94vw - 1rem) / 2)' : 'clamp(12rem, 20vw, 23rem)';
             const tileHeight = isMobileLayout
-              ? finalRows > 4 ? 'clamp(5.4rem, 12vh, 7rem)' : 'clamp(5.8rem, 13.5vh, 7.4rem)'
+              ? 'clamp(7.25rem, 17vh, 9.4rem)'
               : finalRows > 3 ? 'clamp(9.6rem, 22vh, 16.5rem)' : 'clamp(10rem, 24vh, 14rem)';
             return (
               <div
                 key={`${pair.initial.title}-${index}`}
                 style={{
                   position: 'absolute',
-                  left: 0,
-                  top: 0,
+                  left: `${x.toFixed(3)}%`,
+                  top: `${y.toFixed(3)}%`,
                   width: tileWidth,
                   height: tileHeight,
                   opacity,
                   willChange: 'transform, opacity',
-                  transform: `translate3d(${xPx}px, ${yPx}px, 0) scale(${scale.toFixed(4)})`,
+                  transform: `translate3d(0,0,0) scale(${scale.toFixed(4)})`,
                 }}
               >
                 <CreativeMorphPoster initial={pair.initial} final={pair.final} index={index} progress={fill} />
@@ -1774,8 +1780,8 @@ function CreativeProjectsSection({
           <button
             type="button"
             onClick={() => setShowAllGallery(true)}
-            className="absolute bottom-7 left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/35 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/72 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/8 hover:text-white"
-            style={{ opacity: Math.max(0.24, fill) }}
+            className="absolute bottom-[clamp(7rem,17vh,9rem)] left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/[0.09] bg-[#0d0f14]/80 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/65 shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_0_0_0.5px_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:border-white/20 hover:text-white md:bottom-7"
+            style={{ opacity: Math.max(0.3, fill) }}
           >
             Show more ({galleryCount - initialGalleryCount})
             <ArrowDown className="size-3" />
@@ -1784,10 +1790,10 @@ function CreativeProjectsSection({
       </div>
     </section>
     {showAllGallery && remainingGallery.length > 0 && (
-      <section ref={expandedSectionRef} className="relative z-20 -mt-[clamp(3.75rem,13vh,7rem)] bg-[#06080d] pb-20 pt-0 md:mt-0 md:pb-24">
+      <section ref={expandedSectionRef} className="relative z-20 -mt-[clamp(5rem,17vh,8.5rem)] bg-[#06080d] pb-20 pt-0 md:mt-0 md:pb-24">
         <div className="mx-auto w-[94vw] pt-0 md:w-[92vw] md:pt-5 lg:w-[92.2vw]">
           <div
-            className="grid grid-cols-2 gap-x-3 gap-y-3.5 sm:gap-x-4 md:gap-y-5 lg:gap-x-[clamp(2rem,2.75vw,3.5rem)]"
+            className="grid grid-cols-2 gap-4 sm:gap-3 md:gap-4"
             style={{
               gridTemplateColumns: isMobileLayout ? undefined : 'repeat(4, minmax(0, 1fr))',
             }}
@@ -1800,9 +1806,10 @@ function CreativeProjectsSection({
             <button
               type="button"
               onClick={() => setShowAllGallery(false)}
-              className="rounded-full border border-white/12 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55 transition hover:border-white/28 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-white/[0.09] bg-[#0d0f14]/80 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/65 shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_0_0_0.5px_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:border-white/20 hover:text-white"
             >
               Show less
+              <ArrowUp className="size-3" />
             </button>
           </div>
         </div>
@@ -1814,7 +1821,7 @@ function CreativeProjectsSection({
 
 function ExpandedGalleryTile({ image }: { image: GalleryImage }) {
   return (
-    <div className="h-[clamp(6.15rem,14.25vh,7.85rem)] md:h-[clamp(10rem,25.5vh,14.4rem)]">
+    <div className="h-[clamp(7.25rem,17vh,9.4rem)] md:h-[clamp(10rem,25.5vh,14.4rem)]">
       <CreativeMorphPoster initial={image} final={image} index={0} progress={0} />
     </div>
   );
