@@ -203,7 +203,8 @@ export function recordUpload(upload: {
 }
 
 export function ensureUploadDir() {
-  const uploadDir = path.join(DATA_DIR, 'uploads');
+  // Serve from public/uploads/ so Next.js static serving picks it up in dev.
+  const uploadDir = path.join(process.cwd(), 'public', 'uploads');
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
   return uploadDir;
 }

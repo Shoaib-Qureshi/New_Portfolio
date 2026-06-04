@@ -1,5 +1,6 @@
 'use server';
 
+import { put as blobPut } from '@vercel/blob';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -106,29 +107,36 @@ const IS_SERVERLESS = Boolean(
   process.env.VERCEL || process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME,
 );
 
-async function saveImage(file: FormDataEntryValue | null) {
+async function saveImage(file: FormDataEntryValue | null): Promise<string | null> {
   if (!(file instanceof File) || file.size === 0) return null;
   if (!file.type.startsWith('image/')) throw new Error('Only image uploads are allowed.');
   if (file.size > 5 * 1024 * 1024) throw new Error('Images must be smaller than 5MB.');
 
   const ext = path.extname(file.name).toLowerCase() || `.${file.type.split('/')[1] || 'jpg'}`;
-  const filename = `portfolio/${Date.now()}-${randomUUID()}${ext}`;
+  const blobName = `portfolio/${Date.now()}-${randomUUID()}${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // On Vercel/Netlify the local filesystem is read-only — upload to Vercel Blob instead.
-  if (IS_SERVERLESS && process.env.BLOB_READ_WRITE_TOKEN) {
-    const { put } = await import('@vercel/blob');
-    const blob = await put(filename, buffer, { access: 'public', contentType: file.type });
-    recordUpload({ filename, originalName: file.name, mimeType: file.type, size: file.size, publicPath: blob.url });
-    return blob.url;
+  if (IS_SERVERLESS) {
+    // On Vercel/Netlify the local filesystem is read-only and not publicly served.
+    // Must use Vercel Blob. If the token is missing, return null to preserve the existing URL.
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.warn('[admin] BLOB_READ_WRITE_TOKEN not set — image upload skipped, existing URL preserved.');
+      return null;
+    }
+    try {
+      const blob = await blobPut(blobName, buffer, { access: 'public', contentType: file.type });
+      return blob.url;
+    } catch (err) {
+      console.error('[admin] Vercel Blob upload failed:', err);
+      return null;
+    }
   }
 
-  // Local dev — write to public/uploads/ so Next.js can serve it.
+  // Local dev — write to public/uploads/ so Next.js static serving picks it up.
+  const localName = path.basename(blobName);
   const uploadDir = ensureUploadDir();
-  await fs.writeFile(path.join(uploadDir, path.basename(filename)), buffer);
-  const publicPath = `/uploads/${path.basename(filename)}`;
-  recordUpload({ filename: path.basename(filename), originalName: file.name, mimeType: file.type, size: file.size, publicPath });
-  return publicPath;
+  await fs.writeFile(path.join(uploadDir, localName), buffer);
+  return `/uploads/${localName}`;
 }
 
 async function saveGalleryUploads(files: FormDataEntryValue[]): Promise<GalleryImage[]> {
