@@ -102,24 +102,32 @@ function galleryImagesFromFields(formData: FormData): GalleryImage[] {
   return images;
 }
 
+const IS_SERVERLESS = Boolean(
+  process.env.VERCEL || process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME,
+);
+
 async function saveImage(file: FormDataEntryValue | null) {
   if (!(file instanceof File) || file.size === 0) return null;
   if (!file.type.startsWith('image/')) throw new Error('Only image uploads are allowed.');
   if (file.size > 5 * 1024 * 1024) throw new Error('Images must be smaller than 5MB.');
 
   const ext = path.extname(file.name).toLowerCase() || `.${file.type.split('/')[1] || 'jpg'}`;
-  const filename = `${Date.now()}-${randomUUID()}${ext}`;
-  const uploadDir = ensureUploadDir();
+  const filename = `portfolio/${Date.now()}-${randomUUID()}${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(path.join(uploadDir, filename), buffer);
-  const publicPath = `/uploads/${filename}`;
-  recordUpload({
-    filename,
-    originalName: file.name,
-    mimeType: file.type,
-    size: file.size,
-    publicPath,
-  });
+
+  // On Vercel/Netlify the local filesystem is read-only — upload to Vercel Blob instead.
+  if (IS_SERVERLESS && process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import('@vercel/blob');
+    const blob = await put(filename, buffer, { access: 'public', contentType: file.type });
+    recordUpload({ filename, originalName: file.name, mimeType: file.type, size: file.size, publicPath: blob.url });
+    return blob.url;
+  }
+
+  // Local dev — write to public/uploads/ so Next.js can serve it.
+  const uploadDir = ensureUploadDir();
+  await fs.writeFile(path.join(uploadDir, path.basename(filename)), buffer);
+  const publicPath = `/uploads/${path.basename(filename)}`;
+  recordUpload({ filename: path.basename(filename), originalName: file.name, mimeType: file.type, size: file.size, publicPath });
   return publicPath;
 }
 
@@ -225,7 +233,7 @@ export async function deleteProjectAction(formData: FormData) {
   redirect('/admin');
 }
 
-const TOGGLEABLE_SECTIONS = ['testimonials', 'work', 'about', 'contact'];
+const TOGGLEABLE_SECTIONS = ['testimonials', 'work', 'about', 'plugins', 'contact'];
 
 export async function saveSiteSettingsAction(formData: FormData) {
   const content = getPortfolioContent();

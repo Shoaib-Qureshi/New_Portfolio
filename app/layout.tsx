@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
+import { AgentationDev } from '@/components/agentation-dev';
 import './globals.css';
 
 const jakarta = Plus_Jakarta_Sans({
@@ -30,7 +31,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={jakarta.variable}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <AgentationDev />
+      </body>
     </html>
   );
 }

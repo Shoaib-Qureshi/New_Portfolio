@@ -468,6 +468,28 @@ export const seedContent: PortfolioContent = {
       initials: 'MW',
     },
   ],
+  plugins: [
+    {
+      num: '01',
+      id: 'fluentcrm-edition-contacts',
+      name: 'FluentCRM Edition Contacts',
+      category: 'WordPress Plugin',
+      desc: 'Extends FluentCRM with edition-based contact segmentation and automated tag management for course-driven workflows.',
+      tags: ['PHP', 'WordPress', 'FluentCRM', 'MySQL'],
+      githubUrl: 'https://github.com/Shoaib-Qureshi/fluentcrm-edition-contacts',
+      year: '2024',
+    },
+    {
+      num: '02',
+      id: 'ai-blog-commits',
+      name: 'AI Blog Commits',
+      category: 'AI Automation',
+      desc: 'GitHub Action that reads commit history and auto-publishes AI-generated blog posts to WordPress.',
+      tags: ['Node.js', 'GitHub Actions', 'AI Integration', 'TypeScript'],
+      githubUrl: 'https://github.com/Shoaib-Qureshi/AI-blog-commits',
+      year: '2025',
+    },
+  ],
   siteSettings: {
     hiddenSections: ['testimonials'],
     hiddenProjects: [],

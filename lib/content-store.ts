@@ -15,7 +15,7 @@ const IS_SERVERLESS = Boolean(
 );
 const DATA_DIR = IS_SERVERLESS ? '/tmp/portfolio-data' : path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'portfolio.sqlite');
-const CONTENT_KEYS = ['projects', 'galleryImages', 'skills', 'marquee', 'timeline', 'testimonials', 'siteSettings'] as const;
+const CONTENT_KEYS = ['projects', 'galleryImages', 'skills', 'marquee', 'timeline', 'testimonials', 'plugins', 'siteSettings'] as const;
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = { hiddenSections: ['testimonials'], hiddenProjects: [] };
 const PROJECT_COLORS_BY_ID: Record<string, string> = {
@@ -88,6 +88,7 @@ export function getPortfolioContent(): PortfolioContent {
     marquee: readKey('marquee', seedContent.marquee),
     timeline: readKey('timeline', seedContent.timeline),
     testimonials: readKey('testimonials', seedContent.testimonials),
+    plugins: readKey('plugins', seedContent.plugins),
     siteSettings: readKey('siteSettings', DEFAULT_SITE_SETTINGS),
   };
 }

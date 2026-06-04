@@ -8,6 +8,7 @@ import {
   saveSharedContentAction,
   saveSiteSettingsAction,
 } from '@/app/admin/actions';
+import { SaveButton } from '@/app/admin/save-button';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { getPortfolioContent } from '@/lib/content-store';
 import { iconOptions, projectCategories, type GalleryImage, type Project } from '@/lib/content-types';
@@ -34,9 +35,7 @@ function textareaCls() {
 function sectionCard(className = '') {
   return `rounded-2xl border border-white/10 bg-white/[0.035] p-5 sm:p-6 ${className}`;
 }
-function saveBtn() {
-  return 'cursor-pointer rounded-full bg-[var(--accent)] px-6 py-3 text-xs font-bold uppercase tracking-[0.18em] text-black transition hover:opacity-90 active:scale-[0.97] min-h-[44px]';
-}
+
 function sectionLabel() {
   return 'text-[10px] font-semibold uppercase tracking-[0.22em] text-white/40';
 }
@@ -269,7 +268,7 @@ function ProjectForm({ project, isNew = false }: { project?: Project; isNew?: bo
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <button className={saveBtn()}>{isNew ? 'Add project' : 'Save project'}</button>
+        <SaveButton>{isNew ? 'Add project' : 'Save project'}</SaveButton>
       </div>
     </form>
   );
@@ -407,7 +406,7 @@ export default async function AdminPage() {
             <div>
               <p className={`${sectionLabel()} mb-3`}>Sections</p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {(['testimonials', 'work', 'about', 'contact'] as const).map((id) => (
+                {(['testimonials', 'work', 'about', 'plugins', 'contact'] as const).map((id) => (
                   <VisibilityToggle
                     key={id}
                     name="visibleSections"
@@ -435,7 +434,7 @@ export default async function AdminPage() {
               </div>
             </div>
             <div>
-              <button className={saveBtn()}>Save visibility</button>
+              <SaveButton>Save visibility</SaveButton>
             </div>
           </form>
         </section>
@@ -466,7 +465,7 @@ export default async function AdminPage() {
               hint="One entry per line, columns separated by |"
             />
             <div>
-              <button className={saveBtn()}>Save shared content</button>
+              <SaveButton>Save shared content</SaveButton>
             </div>
           </form>
         </section>

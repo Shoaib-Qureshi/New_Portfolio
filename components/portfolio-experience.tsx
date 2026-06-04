@@ -13,11 +13,11 @@ import {
 } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronRight, Code2, Filter, Mail, Menu, Send, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronRight, Code2, Filter, GitBranch, Mail, Menu, Send, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { GalleryImage, PortfolioContent, Project } from '@/lib/content-types';
+import type { GalleryImage, Plugin, PortfolioContent, Project } from '@/lib/content-types';
 import { getIcon } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -25,7 +25,7 @@ import { CustomCursor } from '@/components/custom-cursor';
 import { Button } from '@/components/ui/button';
 import { AnimatedShine, SectionLabel } from '@/components/magic/animated-shine';
 
-const sections = ['hero', 'about', 'work', 'testimonials', 'contact'] as const;
+const sections = ['hero', 'about', 'work', 'plugins', 'testimonials', 'contact'] as const;
 type SectionId = (typeof sections)[number];
 
 const HeroInteractiveField = dynamic(
@@ -154,6 +154,9 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
           galleryImages={content.galleryImages}
           containerRef={containerRef}
         />
+        {!content.siteSettings.hiddenSections.includes('plugins') && (
+          <PluginBuildsSection plugins={content.plugins} />
+        )}
         {!content.siteSettings.hiddenSections.includes('testimonials') && (
           <StickyTestimonialsSection testimonials={content.testimonials} containerRef={containerRef} />
         )}
@@ -2161,6 +2164,91 @@ function TestimonialsSection({
               </motion.div>
             ))}
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   PLUGIN BUILDS
+───────────────────────────────────────────────────────── */
+function PluginBuildsSection({ plugins }: { plugins: Plugin[] }) {
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <section id="plugins" className="relative px-5 py-24 md:px-10 lg:px-16">
+      {/* Top separator line */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+      <div className="mx-auto max-w-6xl">
+        {/* Header — matches site's thin cinematic heading style */}
+        <motion.div
+          className="mb-16 md:mb-20"
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 28 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.35 }}
+          transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <SectionLabel>Custom Builds</SectionLabel>
+          <h2 className="mt-5 text-5xl font-light leading-[1.08] tracking-[-0.05em] sm:text-6xl lg:text-7xl">
+            Custom plugin<br />builds.
+          </h2>
+        </motion.div>
+
+        {/* Rows */}
+        <div className="border-t border-white/8">
+          {plugins.map((plugin, i) => (
+            <motion.a
+              key={plugin.id}
+              href={plugin.githubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`View ${plugin.name} source on GitHub`}
+              className="group relative flex cursor-pointer items-start gap-5 border-b border-white/8 py-8 transition-colors duration-300 md:items-center md:py-10"
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: i * 0.09 }}
+            >
+              {/* Title + desc reveal — flex-1 so tags stay pinned right */}
+              <div className="min-w-0 flex-1">
+                <p className="text-2xl font-light tracking-[-0.04em] text-white/70 transition-colors duration-300 group-hover:text-white md:text-3xl lg:text-[2.5rem] lg:leading-tight">
+                  {plugin.name}
+                </p>
+                {/* Desc slides in under title on hover */}
+                <div className="grid transition-all duration-300 ease-out [grid-template-rows:0fr] group-hover:[grid-template-rows:1fr]">
+                  <div className="overflow-hidden">
+                    <p className="w-[90%] pt-2.5 text-[13px] leading-relaxed text-white/40">{plugin.desc}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tags — right-aligned, rectangular, matching projects section */}
+              <div className="hidden shrink-0 flex-wrap justify-end gap-1.5 md:flex md:max-w-[38%] lg:max-w-[44%]">
+                {plugin.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded border border-white/14 px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/46"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+
+              {/* Mobile tags */}
+              <div className="flex shrink-0 flex-wrap gap-1 md:hidden">
+                {plugin.tags.slice(0, 2).map((t) => (
+                  <span key={t} className="rounded border border-white/14 px-2 py-1 text-[9px] font-medium uppercase tracking-[0.1em] text-white/40">
+                    {t}
+                  </span>
+                ))}
+              </div>
+
+              {/* Git icon — always visible */}
+              <GitBranch className="ml-3 size-[18px] shrink-0 text-white/45" />
+            </motion.a>
+          ))}
         </div>
       </div>
     </section>

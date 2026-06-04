@@ -11,7 +11,7 @@ export default async function LoginPage({ searchParams }: Props) {
   const params = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#06080d] px-5 text-[#f5f5f5]">
+    <main className="flex min-h-screen cursor-auto items-center justify-center bg-[#06080d] px-5 text-[#f5f5f5]">
       <form
         action={loginAction}
         className="w-full max-w-md rounded-[28px] border border-white/10 bg-white/[0.035] p-8 shadow-2xl"

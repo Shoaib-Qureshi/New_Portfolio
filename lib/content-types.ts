@@ -57,6 +57,17 @@ export type Testimonial = {
   initials: string;
 };
 
+export type Plugin = {
+  num: string;
+  id: string;
+  name: string;
+  category: 'WordPress Plugin' | 'AI Automation' | 'WooCommerce Extension';
+  desc: string;
+  tags: string[];
+  githubUrl: string;
+  year: string;
+};
+
 export type SiteSettings = {
   hiddenSections: string[];   // section IDs: 'testimonials' | 'work' | 'about' | etc.
   hiddenProjects: string[];   // project IDs
@@ -69,6 +80,7 @@ export type PortfolioContent = {
   marquee: string[];
   timeline: TimelineItem[];
   testimonials: Testimonial[];
+  plugins: Plugin[];
   siteSettings: SiteSettings;
 };
 
