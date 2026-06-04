@@ -148,7 +148,7 @@ async function saveGalleryUploads(files: FormDataEntryValue[]): Promise<GalleryI
 }
 
 async function projectFromForm(formData: FormData, existing?: Project): Promise<Project> {
-  const content = getPortfolioContent();
+  const content = await getPortfolioContent();
   const title = field(formData, 'title', existing?.title ?? 'Untitled Project');
   const requestedSlug = slugify(field(formData, 'id', existing?.id ?? title));
   const imageUpload = await saveImage(formData.get('imageFile'));
@@ -206,20 +206,20 @@ export async function logoutAction() {
 }
 
 export async function createProjectAction(formData: FormData) {
-  const content = getPortfolioContent();
+  const content = await getPortfolioContent();
   const project = await projectFromForm(formData);
-  saveProjects([...content.projects, project]);
+  await saveProjects([...content.projects, project]);
   refreshPublicPages();
   redirect('/admin');
 }
 
 export async function saveProjectAction(formData: FormData) {
-  const content = getPortfolioContent();
+  const content = await getPortfolioContent();
   const currentId = field(formData, 'currentId');
   const existing = content.projects.find((project) => project.id === currentId);
   if (!existing) redirect('/admin');
   const project = await projectFromForm(formData, existing);
-  saveProjects(content.projects.map((item) => (item.id === currentId ? project : item)));
+  await saveProjects(content.projects.map((item) => (item.id === currentId ? project : item)));
   refreshPublicPages();
   redirect('/admin');
 }
@@ -227,8 +227,8 @@ export async function saveProjectAction(formData: FormData) {
 export async function deleteProjectAction(formData: FormData) {
   if (field(formData, 'confirmDelete') !== 'delete') redirect('/admin');
   const id = field(formData, 'currentId');
-  const content = getPortfolioContent();
-  saveProjects(content.projects.filter((project) => project.id !== id));
+  const content = await getPortfolioContent();
+  await saveProjects(content.projects.filter((project) => project.id !== id));
   refreshPublicPages();
   redirect('/admin');
 }
@@ -236,20 +236,19 @@ export async function deleteProjectAction(formData: FormData) {
 const TOGGLEABLE_SECTIONS = ['testimonials', 'work', 'about', 'plugins', 'contact'];
 
 export async function saveSiteSettingsAction(formData: FormData) {
-  const content = getPortfolioContent();
-  // Checkboxes submit their value only when checked. Checked = visible.
+  const content = await getPortfolioContent();
   const visibleSections = formData.getAll('visibleSections').map(String);
   const visibleProjects = formData.getAll('visibleProjects').map(String);
   const hiddenSections = TOGGLEABLE_SECTIONS.filter((id) => !visibleSections.includes(id));
   const hiddenProjects = content.projects.map((p) => p.id).filter((id) => !visibleProjects.includes(id));
-  savePortfolioContent({ ...content, siteSettings: { hiddenSections, hiddenProjects } });
+  await savePortfolioContent({ ...content, siteSettings: { hiddenSections, hiddenProjects } });
   refreshPublicPages();
   redirect('/admin#site-settings');
 }
 
 export async function saveSharedContentAction(formData: FormData) {
-  const content = getPortfolioContent();
-  savePortfolioContent({
+  const content = await getPortfolioContent();
+  await savePortfolioContent({
     ...content,
     galleryImages: [
       ...galleryImagesFromFields(formData),

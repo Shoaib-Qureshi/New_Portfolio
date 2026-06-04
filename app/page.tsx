@@ -3,7 +3,7 @@ import { getPortfolioContent } from '@/lib/content-store';
 
 export const dynamic = 'force-dynamic';
 
-export default function Page() {
-  const content = getPortfolioContent();
+export default async function Page() {
+  const content = await getPortfolioContent();
   return <PortfolioExperience content={content} />;
 }

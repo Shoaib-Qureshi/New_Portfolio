@@ -9,7 +9,7 @@ type Props = { params: Promise<RouteParams> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const project = getProject(id);
+  const project = await getProject(id);
   if (!project) return { title: 'Not found' };
   return {
     title: `${project.title} - Case Study · Shoaib Qureshi`,
@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CaseStudyPage({ params }: Props) {
   const { id } = await params;
-  const content = getPortfolioContent();
+  const content = await getPortfolioContent();
   const project = content.projects.find((item) => item.id === id) ?? null;
   return <CaseStudy project={project} projects={content.projects} />;
 }

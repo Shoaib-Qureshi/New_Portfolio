@@ -278,7 +278,7 @@ function ProjectForm({ project, isNew = false }: { project?: Project; isNew?: bo
 
 export default async function AdminPage() {
   if (!(await isAdminAuthenticated())) redirect('/admin/login');
-  const content = getPortfolioContent();
+  const content = await getPortfolioContent();
 
   const stats = [
     { label: 'Projects', value: content.projects.length, href: '#projects' },
