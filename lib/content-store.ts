@@ -59,13 +59,34 @@ function getDb() {
 
 function seedLocalIfNeeded(database: Database.Database) {
   const count = database.prepare('select count(*) as count from content').get() as { count: number };
-  if (count.count > 0) return;
-  const insert = database.prepare('insert into content (key, value) values (?, ?)');
-  const seed = seedContent as unknown as Record<ContentKey, unknown>;
-  const tx = database.transaction(() => {
-    for (const key of CONTENT_KEYS) insert.run(key, JSON.stringify(seed[key], null, 2));
-  });
-  tx();
+
+  if (count.count === 0) {
+    // Fresh DB — seed all keys
+    const insert = database.prepare('insert into content (key, value) values (?, ?)');
+    const seed = seedContent as unknown as Record<ContentKey, unknown>;
+    const tx = database.transaction(() => {
+      for (const key of CONTENT_KEYS) insert.run(key, JSON.stringify(seed[key], null, 2));
+    });
+    tx();
+    return;
+  }
+
+  // DB already has content — merge any seed projects missing from the DB so
+  // new entries added to seed-content.ts appear without wiping the database.
+  const row = database.prepare('select value from content where key = ?').get('projects') as { value: string } | undefined;
+  if (!row) return;
+  try {
+    const existing: Project[] = JSON.parse(row.value);
+    const existingIds = new Set(existing.map((p) => p.id));
+    const incoming = seedContent.projects.filter((p) => !existingIds.has(p.id));
+    if (incoming.length === 0) return;
+    const merged = [...existing, ...incoming];
+    database
+      .prepare('update content set value = ?, updated_at = current_timestamp where key = ?')
+      .run(JSON.stringify(merged, null, 2), 'projects');
+  } catch {
+    // ignore malformed stored JSON
+  }
 }
 
 function dbRead<T>(key: ContentKey, fallback: T): T {

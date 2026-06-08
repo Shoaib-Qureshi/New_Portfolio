@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: ['192.168.1.7'],
   reactStrictMode: true,
   // Hide the floating Next.js dev indicator (the "N" logo) in the bottom-left.
   devIndicators: false,
