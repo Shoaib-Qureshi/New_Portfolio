@@ -288,6 +288,76 @@ export const seedContent: PortfolioContent = {
       ],
       link: 'https://www.ananthdecodeslogistics.com/',
     },
+    {
+      num: '05',
+      id: 'frontend-auditor',
+      title: 'Frontend Auditor',
+      category: 'Apps',
+      tags: ['Node.js', 'React', 'Vite', 'Playwright', 'Lighthouse', 'SQLite', 'AI Integration', 'JavaScript'],
+      color: '#F5F5F5',
+      desc: 'Agentic AI tool for automated frontend website auditing. Accepts any URL, queues crawl jobs, and generates comprehensive reports across performance, SEO, security, and broken-link analysis — with real-time log streaming and JSON/HTML export.',
+      year: '2025',
+      role: 'Full-stack development, agentic crawler architecture, Playwright + Lighthouse integration, AI content review pipeline, React frontend.',
+      impact: 'Reduces manual site auditing from hours to minutes. A single URL submission triggers a fully automated audit covering Core Web Vitals, SEO signals, security headers, and crawl mapping across up to 50 pages, with a shareable report at the end.',
+      iconKey: 'code2',
+      image: {
+        src: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=70',
+        alt: 'Code editor with frontend performance audit results',
+      },
+      processImage: {
+        src: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=70',
+        alt: 'Analytics dashboard showing web performance metrics',
+      },
+      challenge:
+        'Auditing a website end-to-end — performance, SEO, security, broken links, and content quality — normally requires running four or five separate tools, stitching results together manually, and re-running everything when the site changes. There was no single tool that could crawl a site to a configurable depth, score every page through Lighthouse, scan headers for security issues, and pass content through an AI reviewer, all from a single URL submission.',
+      solution:
+        'Built an agentic auditing system with a Node.js queue-backed worker, a Playwright-powered crawler, and a React 19 + Vite frontend. The user submits a URL and crawl depth (10, 30, or 50 pages). A background worker queues and processes pages through Lighthouse for Core Web Vitals, a custom SEO validator, an HTTP header security scanner, and an OpenRouter-powered AI content reviewer. Results stream in real time via live logs and are presented across six analysis tabs. Reports export as JSON or formatted HTML.',
+      highlights: [
+        { metric: '6', label: 'Analysis dimensions' },
+        { metric: '50 pages', label: 'Max crawl depth' },
+        { metric: 'Real-time', label: 'Live log streaming' },
+        { metric: 'AI-powered', label: 'Content review layer' },
+      ],
+      process: [
+        {
+          phase: '01',
+          title: 'Crawler & Queue Architecture',
+          detail:
+            'Built a framework-free Node.js server with a SQLite-backed job queue. Playwright handles the crawl — following internal links up to the configured depth, deduplicating URLs, and tracking redirects and broken links. Each crawled page is queued as an individual audit job.',
+        },
+        {
+          phase: '02',
+          title: 'Lighthouse Performance Auditing',
+          detail:
+            'Integrated Lighthouse programmatically to score each crawled page against Core Web Vitals and overall performance. Results include LCP, CLS, TBT, and the full Lighthouse opportunity list, surfaced per-page in the report.',
+        },
+        {
+          phase: '03',
+          title: 'SEO & Metadata Validation',
+          detail:
+            'Built a custom SEO validator that checks title and description presence and length, canonical tags, Open Graph metadata, sitemap and robots.txt availability, and heading structure. Coverage stats roll up to a site-wide SEO score.',
+        },
+        {
+          phase: '04',
+          title: 'Security Header Scanning',
+          detail:
+            'The security scanner checks each page\'s HTTP response headers for HTTPS enforcement, HSTS, CSP, X-Frame-Options, referrer policy, and TLS configuration. Missing or misconfigured headers are flagged with remediation notes.',
+        },
+        {
+          phase: '05',
+          title: 'AI Content Review',
+          detail:
+            'Piped page content through OpenRouter\'s API for AI-powered readability, clarity, and relevance analysis. The reviewer surfaces thin content, keyword stuffing signals, and structural copy issues per page, gated behind an optional API key.',
+        },
+        {
+          phase: '06',
+          title: 'React Frontend & Report Export',
+          detail:
+            'Built the React 19 + Vite frontend with Framer Motion for animated state transitions. Live log streaming gives real-time visibility into the worker. Results are split across six tabs. Reports export as structured JSON for downstream tooling or as a formatted HTML file for sharing.',
+        },
+      ],
+      link: 'https://github.com/Shoaib-Qureshi/frontend_testing',
+    },
   ],
   galleryImages: [
     {
