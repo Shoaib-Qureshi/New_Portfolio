@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import {
+  createPluginAction,
   createProjectAction,
   deleteProjectAction,
   logoutAction,
+  savePluginsAction,
   saveProjectAction,
   saveSharedContentAction,
   saveSiteSettingsAction,
@@ -11,7 +13,7 @@ import {
 import { SaveButton } from '@/app/admin/save-button';
 import { isAdminAuthenticated } from '@/lib/auth';
 import { getPortfolioContent } from '@/lib/content-store';
-import { iconOptions, projectCategories, type GalleryImage, type Project } from '@/lib/content-types';
+import { iconOptions, projectCategories, type GalleryImage, type Plugin, type Project } from '@/lib/content-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -274,6 +276,67 @@ function ProjectForm({ project, isNew = false }: { project?: Project; isNew?: bo
   );
 }
 
+// ── Plugin form ───────────────────────────────────────────────────────────────
+
+const pluginCategories = ['WordPress Plugin', 'AI Automation', 'WooCommerce Extension'] as const;
+
+function PluginFields({ prefix, plugin }: { prefix: string; plugin?: Plugin }) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="Order #" name={`${prefix}Num`} defaultValue={plugin?.num ?? ''} placeholder="01" />
+        <Field label="Slug / ID" name={`${prefix}Id`} defaultValue={plugin?.id ?? ''} placeholder="my-plugin" />
+        <Field label="Name" name={`${prefix}Name`} defaultValue={plugin?.name ?? ''} placeholder="Plugin name" />
+        <Field label="Year" name={`${prefix}Year`} defaultValue={plugin?.year ?? new Date().getFullYear().toString()} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SelectField
+          label="Category"
+          name={`${prefix}Category`}
+          defaultValue={plugin?.category ?? 'WordPress Plugin'}
+          options={pluginCategories.map((c) => ({ value: c, label: c }))}
+        />
+        <Field label="Tags (comma-separated)" name={`${prefix}Tags`} defaultValue={plugin?.tags.join(', ') ?? ''} placeholder="PHP, WordPress" />
+      </div>
+      <Field label="GitHub URL" name={`${prefix}GithubUrl`} defaultValue={plugin?.githubUrl ?? ''} placeholder="https://github.com/…" />
+      <TextArea label="Description" name={`${prefix}Desc`} defaultValue={plugin?.desc ?? ''} />
+    </div>
+  );
+}
+
+function PluginsEditor({ plugins }: { plugins: Plugin[] }) {
+  return (
+    <>
+      <input type="hidden" name="pluginCount" value={plugins.length} />
+      <div className="grid gap-3">
+        {plugins.map((plugin, index) => (
+          <details key={plugin.id} className={sectionCard()}>
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-white/30">{plugin.category} · {plugin.year}</p>
+                <h3 className="mt-1.5 text-lg font-light tracking-[-0.03em] text-white">{plugin.name}</h3>
+                <p className="mt-1 max-w-lg text-xs leading-6 text-white/38 line-clamp-1">{plugin.desc}</p>
+              </div>
+              <span className="mt-1 shrink-0 rounded-full border border-white/10 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                Edit
+              </span>
+            </summary>
+            <div className="mt-6 border-t border-white/8 pt-6">
+              <PluginFields prefix={`plugin_${index}_`} plugin={plugin} />
+              <div className="mt-4 rounded-xl border border-red-400/18 bg-red-400/[0.04] p-4">
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-red-100/60">
+                  <input type="checkbox" name={`plugin_${index}_Remove`} value="yes" className="accent-red-400" />
+                  Remove this plugin when saving
+                </label>
+              </div>
+            </div>
+          </details>
+        ))}
+      </div>
+    </>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function AdminPage() {
@@ -282,9 +345,9 @@ export default async function AdminPage() {
 
   const stats = [
     { label: 'Projects', value: content.projects.length, href: '#projects' },
+    { label: 'Plugins', value: content.plugins.length, href: '#plugins' },
     { label: 'Gallery', value: content.galleryImages.length, href: '#shared-content' },
     { label: 'Timeline', value: content.timeline.length, href: '#shared-content' },
-    { label: 'Testimonials', value: content.testimonials.length, href: '#shared-content' },
     { label: 'Hidden', value: content.siteSettings.hiddenSections.length + content.siteSettings.hiddenProjects.length, href: '#site-settings' },
   ];
 
@@ -392,6 +455,34 @@ export default async function AdminPage() {
                 </div>
               </details>
             ))}
+          </div>
+        </section>
+
+        {/* ── Plugins ── */}
+        <section id="plugins" className="mb-6">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-light tracking-[-0.03em] text-white">Plugin Builds</h2>
+              <p className="mt-1 text-xs text-white/38">Edit or remove existing plugins. Check "Remove" then save to delete.</p>
+            </div>
+            <span className="text-[10px] text-white/30">{content.plugins.length} plugins</span>
+          </div>
+
+          {/* Edit existing */}
+          <form action={savePluginsAction} className="grid gap-3">
+            <PluginsEditor plugins={content.plugins} />
+            <div className="mt-1">
+              <SaveButton>Save plugins</SaveButton>
+            </div>
+          </form>
+
+          {/* Add new */}
+          <div className={`${sectionCard()} mt-4`}>
+            <p className={`${sectionLabel()} mb-4`}>Add new plugin</p>
+            <form action={createPluginAction} className="grid gap-5">
+              <PluginFields prefix="newPlugin_" />
+              <SaveButton>Add plugin</SaveButton>
+            </form>
           </div>
         </section>
 

@@ -14,7 +14,7 @@ import {
   savePortfolioContent,
   saveProjects,
 } from '@/lib/content-store';
-import type { CaseStudyHighlight, CaseStudyPhase, GalleryImage, Project, ProjectIconKey } from '@/lib/content-types';
+import type { CaseStudyHighlight, CaseStudyPhase, GalleryImage, Plugin, Project, ProjectIconKey } from '@/lib/content-types';
 
 function field(formData: FormData, name: string, fallback = '') {
   return String(formData.get(name) ?? fallback).trim();
@@ -277,4 +277,47 @@ export async function saveSharedContentAction(formData: FormData) {
   });
   refreshPublicPages();
   redirect('/admin#shared-content');
+}
+
+function pluginFromFields(formData: FormData, prefix: string): Plugin {
+  const name = field(formData, `${prefix}Name`);
+  return {
+    num: field(formData, `${prefix}Num`),
+    id: field(formData, `${prefix}Id`) || slugify(name),
+    name,
+    category: field(formData, `${prefix}Category`, 'WordPress Plugin') as Plugin['category'],
+    desc: field(formData, `${prefix}Desc`),
+    tags: tags(field(formData, `${prefix}Tags`)),
+    githubUrl: field(formData, `${prefix}GithubUrl`),
+    year: field(formData, `${prefix}Year`, new Date().getFullYear().toString()),
+  };
+}
+
+export async function savePluginsAction(formData: FormData) {
+  const content = await getPortfolioContent();
+  const count = Number(field(formData, 'pluginCount', '0'));
+  const plugins: Plugin[] = [];
+  for (let i = 0; i < count; i++) {
+    if (field(formData, `plugin_${i}_Remove`) === 'yes') continue;
+    const name = field(formData, `plugin_${i}_Name`);
+    if (!name) continue;
+    plugins.push(pluginFromFields(formData, `plugin_${i}_`));
+  }
+  await savePortfolioContent({ ...content, plugins });
+  refreshPublicPages();
+  redirect('/admin#plugins');
+}
+
+export async function createPluginAction(formData: FormData) {
+  const content = await getPortfolioContent();
+  const name = field(formData, 'newPlugin_Name');
+  if (!name) redirect('/admin#plugins');
+  const plugin: Plugin = {
+    ...pluginFromFields(formData, 'newPlugin_'),
+    num: String(content.plugins.length + 1).padStart(2, '0'),
+    id: slugify(name),
+  };
+  await savePortfolioContent({ ...content, plugins: [...content.plugins, plugin] });
+  refreshPublicPages();
+  redirect('/admin#plugins');
 }

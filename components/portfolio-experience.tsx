@@ -1706,7 +1706,7 @@ function CreativeProjectsSection({
 
   return (
     <>
-    <section ref={sectionRef} id="more-work" className="relative h-[200svh] bg-[#06080d] md:h-[218svh]">
+    <section ref={sectionRef} id="more-work" className="relative h-[170svh] bg-[#06080d] md:h-[218svh]">
       <div className="sticky top-0 h-screen overflow-hidden bg-black">
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_45%_30%_at_50%_50%,rgba(255,255,255,0.06),transparent_74%)]" />
 
@@ -1776,7 +1776,7 @@ function CreativeProjectsSection({
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-40 h-32 bg-gradient-to-b from-[#06080d] via-black/78 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-32 bg-gradient-to-t from-[#06080d] via-black/78 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-16 bg-gradient-to-t from-[#06080d] via-black/78 to-transparent md:h-32" />
         <div className="pointer-events-none absolute inset-y-0 left-0 z-40 w-28 bg-gradient-to-r from-black to-transparent" />
         <div className="pointer-events-none absolute inset-y-0 right-0 z-40 w-28 bg-gradient-to-l from-black to-transparent" />
         {canToggleGallery && !showAllGallery && (
@@ -1793,7 +1793,7 @@ function CreativeProjectsSection({
       </div>
     </section>
     {showAllGallery && remainingGallery.length > 0 && (
-      <section ref={expandedSectionRef} className="relative z-20 -mt-[clamp(5rem,17vh,8.5rem)] bg-[#06080d] pb-20 pt-0 md:mt-0 md:pb-24">
+      <section ref={expandedSectionRef} className="relative z-20 -mt-[clamp(9rem,25vh,13rem)] bg-[#06080d] pb-20 pt-0 md:mt-0 md:pb-24">
         <div className="mx-auto w-[94vw] pt-0 md:w-[92vw] md:pt-5 lg:w-[92.2vw]">
           <div
             className="grid grid-cols-2 gap-4 sm:gap-3 md:gap-4"
@@ -2177,7 +2177,7 @@ function PluginBuildsSection({ plugins }: { plugins: Plugin[] }) {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <section id="plugins" className="relative px-5 py-24 md:px-10 lg:px-16">
+    <section id="plugins" className="relative px-5 pb-24 pt-12 md:px-10 md:py-24 lg:px-16">
       {/* Top separator line */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
@@ -2205,48 +2205,60 @@ function PluginBuildsSection({ plugins }: { plugins: Plugin[] }) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`View ${plugin.name} source on GitHub`}
-              className="group relative flex cursor-pointer items-start gap-5 border-b border-white/8 py-8 transition-colors duration-300 md:items-center md:py-10"
+              className="group relative flex cursor-pointer flex-col gap-3 border-b border-white/8 py-7 transition-colors duration-300 md:flex-row md:items-center md:gap-5 md:py-10"
               initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
               transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: i * 0.09 }}
             >
-              {/* Title + desc reveal — flex-1 so tags stay pinned right */}
+              {/* Title row */}
               <div className="min-w-0 flex-1">
-                <p className="text-2xl font-light tracking-[-0.04em] text-white/70 transition-colors duration-300 group-hover:text-white md:text-3xl lg:text-[2.5rem] lg:leading-tight">
-                  {plugin.name}
-                </p>
-                {/* Desc slides in under title on hover */}
-                <div className="grid transition-all duration-300 ease-out [grid-template-rows:0fr] group-hover:[grid-template-rows:1fr]">
+                <div className="md:block">
+                  <p className="text-2xl font-light tracking-[-0.04em] text-white/70 transition-colors duration-300 group-hover:text-white md:text-3xl lg:text-[2.5rem] lg:leading-tight">
+                    {plugin.name}
+                  </p>
+                </div>
+
+                {/* Desc — always visible on mobile */}
+                <p className="mt-2 text-[13px] leading-relaxed text-white/40 md:hidden">{plugin.desc}</p>
+
+                {/* Desc — hover-reveal on desktop */}
+                <div className="hidden md:grid transition-all duration-300 ease-out [grid-template-rows:0fr] group-hover:[grid-template-rows:1fr]">
                   <div className="overflow-hidden">
                     <p className="w-[90%] pt-2.5 text-[13px] leading-relaxed text-white/40">{plugin.desc}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Tags — right-aligned, rectangular, matching projects section */}
-              <div className="hidden shrink-0 flex-wrap justify-end gap-1.5 md:flex md:max-w-[38%] lg:max-w-[44%]">
+              {/* Tags — mobile: full set, below title */}
+              <div className="flex flex-wrap gap-1.5 md:hidden">
                 {plugin.tags.map((t) => (
                   <span
                     key={t}
-                    className="rounded border border-white/14 px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/46"
+                    className="rounded border border-[#e5e7eb21] px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/46"
                   >
                     {t}
                   </span>
                 ))}
               </div>
 
-              {/* Mobile tags */}
-              <div className="flex shrink-0 flex-wrap gap-1 md:hidden">
-                {plugin.tags.slice(0, 2).map((t) => (
-                  <span key={t} className="rounded border border-white/14 px-2 py-1 text-[9px] font-medium uppercase tracking-[0.1em] text-white/40">
+              {/* Tags — desktop: right-aligned */}
+              <div className="hidden shrink-0 flex-wrap justify-end gap-1.5 md:flex md:max-w-[38%] lg:max-w-[44%]">
+                {plugin.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded border border-[#e5e7eb21] px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/46"
+                  >
                     {t}
                   </span>
                 ))}
               </div>
 
-              {/* Git icon — always visible */}
-              <GitBranch className="ml-3 size-[18px] shrink-0 text-white/45" />
+              {/* Git icon — mobile: bottom of column */}
+              <GitBranch className="size-[22px] shrink-0 text-white/45 md:hidden" />
+
+              {/* Git icon — desktop: end of row */}
+              <GitBranch className="ml-3 hidden size-[18px] shrink-0 text-white/45 md:block" />
             </motion.a>
           ))}
         </div>
