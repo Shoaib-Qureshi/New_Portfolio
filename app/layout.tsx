@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import { AgentationDev } from '@/components/agentation-dev';
 import './globals.css';
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={jakarta.variable}>
       <body>
         {children}
+        <Analytics />
         <AgentationDev />
       </body>
     </html>
