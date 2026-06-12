@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import { AgentationDev } from '@/components/agentation-dev';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 const jakarta = Plus_Jakarta_Sans({
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         {children}
         <AgentationDev />
+        <Analytics />
       </body>
     </html>
   );
