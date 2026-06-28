@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import { AgentationDev } from '@/components/agentation-dev';
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 
 const jakarta = Plus_Jakarta_Sans({
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {children}
         <AgentationDev />
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
