@@ -25,6 +25,31 @@ const PROJECT_COLORS_BY_ID: Record<string, string> = {
   'ananth-decodes': '#F5F5F5',
 };
 
+// Keep the current project artwork in the codebase for now. This prevents
+// public pages from depending on image paths stored in the admin database.
+const PROJECT_IMAGES_BY_ID: Record<string, { image: Project['image']; processImage: Project['processImage'] }> = {
+  prepmedico: {
+    image: { src: '/uploads/1780392252151-1c3f0432-6de7-40d8-bd8c-903e22219a09.png', alt: 'PrepMedico' },
+    processImage: { src: '/uploads/1780396579720-0194db68-aa0f-4af0-a885-f62157f0533e.png', alt: 'PrepMedico' },
+  },
+  liquidflow: {
+    image: { src: '/uploads/1780400252130-222e9349-5f7a-4990-913f-346e1b5681b3.png', alt: 'LiquidFlow design subscription platform dashboard' },
+    processImage: { src: '/uploads/1780400252148-ac51bfd8-f063-4cb9-a7f5-4891ed988ce4.png', alt: 'Design task workflow and collaboration board' },
+  },
+  threadwrite: {
+    image: { src: 'https://images.unsplash.com/photo-1655720828018-edd2daec9349?auto=format&fit=crop&w=1200&q=70', alt: 'AI-assisted text editing interface on a modern screen' },
+    processImage: { src: 'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?auto=format&fit=crop&w=1200&q=70', alt: 'AI pipeline workflow diagram with nodes and connections' },
+  },
+  'ananth-decodes': {
+    image: { src: '/uploads/1780413509037-bd2d0ed5-7be9-4f12-a9b6-9d98604f7997.png', alt: 'Logistics supply chain operations aerial view' },
+    processImage: { src: '/uploads/1780413636710-370ba5e6-0b7b-4a2a-8566-de3ddde05361.png', alt: 'Content strategy and editorial planning workspace' },
+  },
+  'frontend-auditor': {
+    image: { src: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=70', alt: 'Code editor with frontend performance audit results' },
+    processImage: { src: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=70', alt: 'Analytics dashboard showing web performance metrics' },
+  },
+};
+
 type ContentKey = (typeof CONTENT_KEYS)[number];
 
 // ── Local SQLite (dev) ────────────────────────────────────────────────────────
@@ -146,10 +171,10 @@ async function kvSeedIfNeeded(): Promise<void> {
 export async function getPortfolioContent(): Promise<PortfolioContent> {
   if (IS_SERVERLESS && HAS_KV) {
     await kvSeedIfNeeded();
-    const projects = normalizeProjectColors(await kvRead('projects', seedContent.projects));
+    const projects = normalizeProjectImages(normalizeProjectColors(await kvRead('projects', seedContent.projects)));
     return {
       projects,
-      galleryImages: await kvRead('galleryImages', buildGalleryFallback(projects)),
+      galleryImages: seedContent.galleryImages,
       skills:        await kvRead('skills',        seedContent.skills),
       marquee:       await kvRead('marquee',       seedContent.marquee),
       timeline:      await kvRead('timeline',      seedContent.timeline),
@@ -160,10 +185,10 @@ export async function getPortfolioContent(): Promise<PortfolioContent> {
   }
 
   // Local dev or Netlify without KV → SQLite
-  const projects = normalizeProjectColors(dbRead('projects', seedContent.projects));
+  const projects = normalizeProjectImages(normalizeProjectColors(dbRead('projects', seedContent.projects)));
   return {
     projects,
-    galleryImages: dbRead('galleryImages', buildGalleryFallback(projects)),
+    galleryImages: seedContent.galleryImages,
     skills:        dbRead('skills',        seedContent.skills),
     marquee:       dbRead('marquee',       seedContent.marquee),
     timeline:      dbRead('timeline',      seedContent.timeline),
@@ -209,6 +234,13 @@ function normalizeProjectColors(projects: Project[]) {
   return projects.map((project) => ({
     ...project,
     color: PROJECT_COLORS_BY_ID[project.id] ?? project.color,
+  }));
+}
+
+function normalizeProjectImages(projects: Project[]) {
+  return projects.map((project) => ({
+    ...project,
+    ...(PROJECT_IMAGES_BY_ID[project.id] ?? {}),
   }));
 }
 
