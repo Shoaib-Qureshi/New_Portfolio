@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
+import Script from 'next/script';
 import { AgentationDev } from '@/components/agentation-dev';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
@@ -36,6 +37,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {children}
         <AgentationDev />
         <Analytics />
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-C0WK5VBHHK"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-C0WK5VBHHK');
+          `}
+        </Script>
       </body>
     </html>
   );
