@@ -13,6 +13,7 @@ import {
 } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
 import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronRight, Code2, Filter, GitBranch, Mail, Menu, Send, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -28,10 +29,24 @@ import { AnimatedShine, SectionLabel } from '@/components/magic/animated-shine';
 const sections = ['hero', 'about', 'work', 'plugins', 'testimonials', 'contact'] as const;
 type SectionId = (typeof sections)[number];
 
-const HeroInteractiveField = dynamic(
-  () => import('@/components/hero-interactive-field').then((mod) => mod.HeroInteractiveField),
+// Site-wide fixed backdrop. Sections that want it visible simply omit their own
+// opaque `bg-[#06080d]`; everything else paints over it as before.
+const HorizonField = dynamic(
+  () => import('@/components/horizon-field').then((mod) => mod.HorizonField),
   { ssr: false },
 );
+
+// WebGL drum for the creative section — cards curved onto a rotating cylinder.
+const CreativeDrum = dynamic(
+  () => import('@/components/creative-drum').then((mod) => mod.CreativeDrum),
+  { ssr: false },
+);
+
+const HelixGallerySection = dynamic(
+  () => import('@/components/helix-gallery').then((mod) => mod.HelixGallerySection),
+  { ssr: false },
+);
+
 
 const SplineWorkScene = dynamic(
   () => import('@/components/spline-work-scene').then((mod) => mod.SplineWorkScene),
@@ -60,6 +75,8 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
   const [loaderVisible, setLoaderVisible] = useState(true);
   const [introComplete, setIntroComplete] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const lenisRef = useRef<Lenis | null>(null);
 
   useEffect(() => {
     const duration = 900;
@@ -119,9 +136,42 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
     };
   }, []);
 
+  /* Lenis interpolates the scroll position itself, so every scroll-driven piece
+     on the page — helix, headlines, GSAP triggers — reads from one eased value
+     instead of each easing separately and drifting out of step. */
+  useEffect(() => {
+    const wrapper = containerRef.current;
+    const content = contentRef.current;
+    if (!wrapper || !content) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const lenis = new Lenis({ wrapper, content, duration: 1.05, smoothWheel: true });
+    lenisRef.current = lenis;
+
+    // ScrollTrigger reads scroll on its own schedule; keep it on Lenis' clock.
+    lenis.on('scroll', ScrollTrigger.update);
+
+    let raf = 0;
+    const tick = (time: number) => {
+      lenis.raf(time);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      lenis.destroy();
+      lenisRef.current = null;
+    };
+  }, []);
+
   const scrollTo = (id: SectionId) => {
     setMenuOpen(false);
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const target = document.getElementById(id);
+    if (!target) return;
+    // Native smooth scrolling fights Lenis for the same scrollTop.
+    if (lenisRef.current) lenisRef.current.scrollTo(target, { offset: 0 });
+    else target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -132,15 +182,23 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
       >
         Skip to content
       </a>
+      <HorizonField />
       <div className="noise" />
       <IntroLoader value={loaderValue} visible={loaderVisible} />
       <CustomCursor />
       <FloatingNav active={active} onNavigate={scrollTo} menuOpen={menuOpen} setMenuOpen={setMenuOpen} hiddenSections={content.siteSettings.hiddenSections} />
       <div
         ref={containerRef}
-        className="h-screen overflow-y-auto overflow-x-hidden overscroll-contain scroll-smooth"
+        // `relative` without a z-index on purpose: it still paints above the
+        // backdrop (later in tree order) but does NOT open a stacking context,
+        // so `mix-blend-mode` layers inside — the Spline scene — can still see
+        // the HorizonField as their backdrop.
+        // No `scroll-smooth`: Lenis owns scrollTop, and CSS smooth scrolling
+        // fights it for the same property.
+        className="relative h-screen overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ scrollbarGutter: 'stable' }}
       >
+        <div ref={contentRef}>
         <HeroSection onNavigate={scrollTo} containerRef={containerRef} introComplete={introComplete} />
         <MarqueeStrip marquee={content.marquee} />
         {!content.siteSettings.hiddenSections.includes('about') && (
@@ -149,9 +207,8 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
         {!content.siteSettings.hiddenSections.includes('work') && (
           <ProjectsSection projects={content.projects.filter(p => !content.siteSettings.hiddenProjects.includes(p.id))} />
         )}
-        <CreativeProjectsSection
-          projects={content.projects.filter(p => !content.siteSettings.hiddenProjects.includes(p.id))}
-          galleryImages={content.galleryImages}
+        <HelixGallerySection
+          images={content.galleryImages}
           containerRef={containerRef}
         />
         {!content.siteSettings.hiddenSections.includes('plugins') && (
@@ -162,6 +219,7 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
         )}
         {!content.siteSettings.hiddenSections.includes('contact') && <ContactSection />}
         <Footer />
+        </div>
       </div>
     </main>
   );
@@ -330,7 +388,6 @@ function HeroSection({
   const ctaRef = useRef<HTMLDivElement | null>(null);
   const badgeRef = useRef<HTMLDivElement | null>(null);
   const availabilityCardRef = useRef<HTMLDivElement | null>(null);
-  const meshLayerRef = useRef<HTMLDivElement | null>(null);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -372,19 +429,8 @@ function HeroSection({
       });
       gsap.set([subcopyRef.current, ctaRef.current, badgeRef.current], { opacity: 0, y: 28 });
       gsap.set(availabilityCardRef.current, { opacity: 0, y: 28 });
-      if (!prefersReduced) gsap.set(meshLayerRef.current, { scale: 0.92, opacity: 0.6 });
 
-      const tl = gsap.timeline({
-        paused: true,
-        defaults: { ease: 'power3.out' },
-        onUpdate: () => {
-          window.dispatchEvent(
-            new CustomEvent('hero-bubble-scroll', {
-              detail: { progress: prefersReduced ? 0 : tl.progress() * 0.35 },
-            }),
-          );
-        },
-      });
+      const tl = gsap.timeline({ paused: true, defaults: { ease: 'power3.out' } });
 
       /* Stage 1 — heading + supporting copy reveal */
       tl.to(badgeRef.current, { opacity: 1, y: 0, duration: 0.55 }, 0)
@@ -393,14 +439,7 @@ function HeroSection({
         .to(subcopyRef.current, { opacity: 1, y: 0, duration: 0.6 }, 0.7)
         .to(ctaRef.current, { opacity: 1, y: 0, duration: 0.55 }, 0.85);
 
-      /* Stage 2 — mesh blooms into place */
-      if (!prefersReduced) {
-        tl.to(meshLayerRef.current, { scale: 1, opacity: 1, duration: 1.4, ease: 'power2.out' }, 0.15);
-      } else {
-        tl.set(meshLayerRef.current, { scale: 1, opacity: 1 }, 0);
-      }
-
-      /* Stage 3 — floating cards arrive */
+      /* Stage 2 — floating cards arrive */
       tl.to(availabilityCardRef.current, { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out' }, 1.05);
 
       /* Trigger when the hero enters the viewport (autoplay once) */
@@ -421,59 +460,17 @@ function HeroSection({
     };
   }, [introComplete, containerRef]);
 
-  useEffect(() => {
-    if (!introComplete) return;
-    const scroller = containerRef.current;
-    const section = sectionRef.current;
-    if (!scroller || !section) return;
-
-    let frame = 0;
-    let currentProgress = 0;
-    let targetProgress = 0;
-    const updateHeroScroll = () => {
-      const travel = Math.max(1, section.offsetHeight * 0.72);
-      targetProgress = Math.min(1, Math.max(0, (scroller.scrollTop - section.offsetTop) / travel)) ** 0.72;
-    };
-
-    const tickHeroScroll = () => {
-      currentProgress += (targetProgress - currentProgress) * 0.12;
-      window.dispatchEvent(new CustomEvent('hero-bubble-scroll', { detail: { progress: currentProgress } }));
-      frame = requestAnimationFrame(tickHeroScroll);
-    };
-
-    updateHeroScroll();
-    tickHeroScroll();
-    scroller.addEventListener('scroll', updateHeroScroll, { passive: true });
-    window.addEventListener('resize', updateHeroScroll);
-
-    return () => {
-      cancelAnimationFrame(frame);
-      scroller.removeEventListener('scroll', updateHeroScroll);
-      window.removeEventListener('resize', updateHeroScroll);
-    };
-  }, [introComplete, containerRef]);
-
   return (
     <section
       id="hero"
       ref={sectionRef}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
-      className="relative h-[100svh] overflow-visible bg-[#06080d]"
+      className="relative h-[100svh] overflow-visible"
     >
-      <div ref={meshLayerRef} className="pointer-events-none fixed inset-0 z-[1] will-change-transform">
-        <motion.div
-          className="pointer-events-none absolute -inset-x-[22vw] -inset-y-[10vh] translate-x-[9vw] translate-y-[7vh] blur-[1.2px] md:inset-0 md:translate-x-0 md:translate-y-0 md:blur-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: introComplete ? 1 : 0.42 }}
-          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <HeroInteractiveField />
-        </motion.div>
-      </div>
-
       <motion.div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[2]" style={{ background: spotlight }} />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[3] bg-[radial-gradient(ellipse_62%_54%_at_62%_43%,rgba(var(--accent-rgb),0.035)_0%,transparent_68%),radial-gradient(ellipse_72%_62%_at_50%_45%,transparent_42%,rgba(6,8,13,0.78)_90%),linear-gradient(to_bottom,#06080d_0%,transparent_16%,transparent_62%,#06080d_100%)]" />
+      {/* Scrim only behind the headline block — the HorizonField owns the rest. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[3] bg-[linear-gradient(to_bottom,rgba(6,8,13,0.72)_0%,rgba(6,8,13,0.18)_34%,transparent_58%,rgba(6,8,13,0.62)_100%)]" />
 
       {/* Floating cards */}
       <div
@@ -490,7 +487,7 @@ function HeroSection({
       >
         <motion.div style={{ x: textX, y: textY }} className="max-w-5xl">
           <div ref={badgeRef} className="mb-6 flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/44">
-            <span className="rounded-full border border-[rgba(var(--accent-rgb),0.38)] px-3 py-1.5 text-[var(--accent)]">Available for select builds</span>
+            <span className="rounded-full border border-[rgba(var(--accent-rgb),0.38)] px-3 py-1.5 text-[var(--accent)]">Available for work</span>
             <span>Bengaluru, India</span>
           </div>
           <h1 className="text-balance text-[clamp(4.2rem,15vw,12rem)] font-light leading-[0.92] tracking-[-0.075em] text-white md:leading-[0.88]">
@@ -502,7 +499,7 @@ function HeroSection({
           </h1>
           <div className="mt-7 grid max-w-3xl gap-5 md:grid-cols-[1fr_auto] md:items-end">
             <p ref={subcopyRef} className="max-w-2xl text-sm leading-7 text-white/58 sm:text-base">
-              Senior frontend developer crafting cinematic interfaces, React and Laravel applications, and AI-powered tools across Next.js, WordPress, and WooCommerce.
+              Senior frontend developer. I build React and Laravel applications, WordPress and WooCommerce systems, and AI tooling — from medical course platforms to editorial pipelines.
             </p>
             <div ref={ctaRef}>
               <Button onClick={() => onNavigate('work')} className="w-max">
@@ -804,9 +801,9 @@ function AboutSection({
   }, [containerRef]);
 
   const firstText =
-    'I design and build React and Laravel applications, AI-powered tools, WordPress systems, and WooCommerce stores. Products that feel considered without becoming ornamental.';
+    'I design and build React and Laravel applications, AI-powered tools, WordPress systems, and WooCommerce stores. Interfaces that stay fast and readable once real content lands in them.';
   const secondText =
-    'My work spans frontend engineering, CMS architecture, and AI workflows, from automated markdown and documentation pipelines to editorial tooling, always with an eye for performance, structure, and usability.';
+    'That means frontend engineering, CMS architecture, and AI workflows in the same project — documentation pipelines, editorial tooling, and admin systems a client can run without calling me.';
 
   return (
     <section ref={sectionRef} id="about" className="relative scroll-mt-20 bg-[#06080d]">
@@ -824,7 +821,7 @@ function AboutSection({
                   <SectionLabel>About</SectionLabel>
                 </div>
                 <h2 className="text-balance text-[2.25rem] font-light leading-[0.96] tracking-[-0.055em] sm:text-6xl">
-                  Where interface craft meets engineering depth.
+                  I build the interface and the system behind it.
                 </h2>
                 <div className="mt-5 grid max-w-md grid-cols-2 gap-3 md:mt-10 md:gap-4">
                   {[
@@ -1073,14 +1070,21 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
 
   return (
     <section id="work" className="relative mx-auto max-w-7xl scroll-mt-20 overflow-hidden px-5 pb-4 pt-4 sm:px-8 sm:pt-24 lg:px-10 lg:py-32">
-      <div className="pointer-events-none absolute inset-x-[-46%] top-[-2rem] z-0 h-[38rem] opacity-[0.62] sm:inset-x-[-22%] sm:top-[-16rem] sm:h-[68rem] lg:inset-x-[-16%] lg:h-[72rem]">
-        <div className="absolute inset-0 origin-[52%_38%] scale-[1.1] sm:origin-[58%_38%] sm:scale-[1.16] lg:scale-[1.08]">
+      {/* `opacity` + `transform` below isolate this group, so the canvas' own
+          blend mode can't reach the page. Blend the whole group instead — that
+          drops the Spline's opaque black clear colour against the backdrop. */}
+      <div className="pointer-events-none absolute inset-x-[-30%] top-[5rem] z-0 h-[30rem] opacity-[0.62] mix-blend-lighten sm:inset-x-[-22%] sm:top-[-16rem] sm:h-[68rem] lg:inset-x-[-16%] lg:h-[72rem]">
+        <div className="absolute inset-0 origin-[52%_38%] scale-[0.92] sm:origin-[58%_38%] sm:scale-[1.16] lg:scale-[1.08]">
           {showSpline && <SplineWorkScene />}
         </div>
       </div>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-[-16%] top-[-4rem] z-[1] h-[54rem] bg-[radial-gradient(ellipse_32%_28%_at_34%_38%,rgba(var(--accent-rgb),0.04),transparent_74%),radial-gradient(ellipse_24%_22%_at_32%_44%,rgba(255,122,47,0.036),transparent_78%),linear-gradient(to_right,#06080d_0%,rgba(6,8,13,0.18)_20%,rgba(6,8,13,0)_38%,rgba(6,8,13,0)_54%,#06080d_78%,#06080d_100%),linear-gradient(to_bottom,#06080d_0%,rgba(6,8,13,0)_24%,rgba(6,8,13,0)_42%,#06080d_76%)]"
+        // The two opaque #06080d vignette masks that used to sit here were there
+        // to hide the Spline's edges against a flat page. They painted hard-edged
+        // rectangles over the HorizonField, so they're gone — the canvas' own
+        // elliptical mask already handles its edges. Soft accent glows kept.
+        className="pointer-events-none absolute inset-x-[-16%] top-[-4rem] z-[1] h-[54rem] bg-[radial-gradient(ellipse_32%_28%_at_34%_38%,rgba(var(--accent-rgb),0.04),transparent_74%),radial-gradient(ellipse_24%_22%_at_32%_44%,rgba(255,122,47,0.036),transparent_78%)]"
       />
       <motion.div
         initial={{ opacity: 0, y: 36 }}
@@ -1092,9 +1096,9 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
         <div className="max-w-4xl">
           <SectionLabel>Selected Work</SectionLabel>
           <h2 className="text-balance text-5xl font-light leading-none tracking-[-0.055em] sm:text-7xl">
-            Built to ship.
+            Client builds,
             <br />
-            Engineered to last.
+            start to finish.
           </h2>
         </div>
         <motion.div
@@ -1600,6 +1604,171 @@ function interpolateTimeline(
   return output[output.length - 1];
 }
 
+function UnusedReferenceProjectsSection({
+  projects,
+  galleryImages,
+  containerRef,
+}: {
+  projects: Project[];
+  galleryImages: GalleryImage[];
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const scrollTarget = useRef(0);
+  const [progress, setProgress] = useState(0);
+  const [pointer, setPointer] = useState({ x: 0, y: 0 });
+  const [hovered, setHovered] = useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  const detailImages = useMemo(() => {
+    if (galleryImages.length > 0) return galleryImages.slice(0, 3);
+    return projects.slice(0, 3).map((project) => ({
+      src: project.processImage.src,
+      alt: project.processImage.alt,
+      title: project.title,
+      sub: project.category,
+    }));
+  }, [galleryImages, projects]);
+
+  useEffect(() => {
+    const scroller = containerRef.current;
+    const section = sectionRef.current;
+    if (!scroller || !section) return;
+
+    let frame = 0;
+    const measure = () => {
+      const travel = Math.max(1, section.offsetHeight - scroller.clientHeight);
+      scrollTarget.current = Math.min(1, Math.max(0, (scroller.scrollTop - section.offsetTop) / travel));
+    };
+    const tick = () => {
+      setProgress((current) => {
+        const next = current + (scrollTarget.current - current) * (prefersReducedMotion ? 1 : 0.09);
+        return Math.abs(next - current) < 0.001 ? scrollTarget.current : next;
+      });
+      frame = requestAnimationFrame(tick);
+    };
+
+    measure();
+    tick();
+    scroller.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      scroller.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, [containerRef, prefersReducedMotion]);
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (prefersReducedMotion || event.pointerType === 'touch') return;
+    const bounds = stageRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    setPointer({
+      x: ((event.clientX - bounds.left) / bounds.width - 0.5) * 2,
+      y: ((event.clientY - bounds.top) / bounds.height - 0.5) * 2,
+    });
+  };
+
+  return (
+    <section ref={sectionRef} id="more-work" className="relative h-[300svh] md:h-[340svh]">
+      <div
+        ref={stageRef}
+        className="sticky top-0 h-screen overflow-hidden bg-[#06080d]"
+        onPointerMove={handlePointerMove}
+        onPointerLeave={() => setPointer({ x: 0, y: 0 })}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(117,139,255,0.11),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_38%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-[14%] z-10 text-center text-[10px] font-semibold uppercase tracking-[0.24em] text-white/40">
+          Screens and interfaces
+          <br />
+          from projects I&apos;ve shipped.
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-0 -translate-y-1/2 select-none px-4 sm:px-8">
+          <div
+            className="text-[clamp(3.3rem,11.8vw,10rem)] font-light leading-[0.79] tracking-[-0.075em] text-white/[0.13] transition-transform duration-700"
+            style={{ transform: `translate3d(${pointer.x * -16}px, ${pointer.y * -5}px, 0)` }}
+          >
+            MORE THINGS
+          </div>
+          <div
+            className="text-right text-[clamp(3.3rem,11.8vw,10rem)] font-light leading-[0.79] tracking-[-0.075em] text-white/[0.13] transition-transform duration-700"
+            style={{ transform: `translate3d(${pointer.x * 16}px, ${pointer.y * 5}px, 0)` }}
+          >
+            I&apos;VE BUILT
+          </div>
+        </div>
+
+        <div
+          className="absolute left-1/2 top-1/2 z-20 h-[min(64vh,35rem)] w-[min(88vw,70rem)] -translate-x-1/2 -translate-y-1/2"
+          style={{ perspective: '1400px' }}
+        >
+          {projects.map((project, index) => {
+            const spread = index - (projects.length - 1) / 2;
+            const projectLink = project.link ?? '#more-work';
+            const x = spread * 16.5 + pointer.x * (10 + Math.abs(spread) * 2) - progress * spread * 30;
+            const y = Math.abs(spread) * 8 + pointer.y * (7 + Math.abs(spread)) + progress * (index * 19 - 38);
+            const rotate = spread * 5.5 + pointer.x * (index % 2 === 0 ? -2.2 : 2.2) - progress * spread * 2;
+            const scale = (hovered === project.id ? 1.045 : 1) - Math.abs(spread) * 0.035 + progress * 0.04;
+
+            return (
+              <a
+                key={project.id}
+                href={projectLink}
+                target={projectLink.startsWith('http') ? '_blank' : undefined}
+                rel={projectLink.startsWith('http') ? 'noreferrer' : undefined}
+                aria-label={`Open ${project.title} project`}
+                className="group absolute left-1/2 top-1/2 block h-[min(35vh,20rem)] w-[min(48vw,31rem)] -translate-x-1/2 -translate-y-1/2 cursor-pointer overflow-hidden rounded-[1.25rem] border border-white/15 bg-[#10141d] shadow-[0_30px_90px_rgba(0,0,0,0.5)] outline-none transition-[filter,box-shadow] duration-300 hover:border-white/35 hover:shadow-[0_38px_110px_rgba(0,0,0,0.65)] focus-visible:ring-2 focus-visible:ring-white/70 max-md:h-[min(30vh,14rem)] max-md:w-[min(76vw,24rem)]"
+                style={{
+                  transform: `translate3d(calc(-50% + ${x}px), calc(-50% + ${y}px), ${index * -34}px) rotate(${rotate}deg) scale(${scale})`,
+                  zIndex: projects.length - Math.abs(Math.round(spread)),
+                  filter: hovered === project.id ? 'brightness(1.12)' : `brightness(${0.88 + index * 0.02})`,
+                  transition: prefersReducedMotion ? 'none' : 'transform 700ms cubic-bezier(.16,1,.3,1), filter 300ms ease, box-shadow 300ms ease',
+                }}
+                onPointerEnter={() => setHovered(project.id)}
+                onPointerLeave={() => setHovered(null)}
+              >
+                <Image src={project.image.src} alt={project.image.alt} fill sizes="(max-width: 768px) 76vw, 48vw" className="object-cover transition duration-700 group-hover:scale-[1.06]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#06080d]/95 via-[#06080d]/10 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 sm:p-5">
+                  <div>
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-white/50">{project.category}</div>
+                    <h3 className="mt-1 text-lg font-medium tracking-[-0.04em] text-white sm:text-2xl">{project.title}</h3>
+                  </div>
+                  <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-white/25 bg-black/20 text-white/70 transition duration-300 group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:border-white group-hover:text-white">
+                    <ArrowUpRight className="size-3.5" />
+                  </span>
+                </div>
+              </a>
+            );
+          })}
+
+          {detailImages.map((image, index) => (
+            <div
+              key={`detail-${image.src}-${index}`}
+              aria-hidden="true"
+              className="pointer-events-none absolute left-1/2 top-1/2 hidden h-20 w-28 overflow-hidden rounded-lg border border-white/20 opacity-70 shadow-2xl sm:block"
+              style={{ transform: `translate3d(calc(-50% + ${(index - 1) * 210 + pointer.x * 18}px), calc(-50% + ${-155 + pointer.y * 10}px), -180px) rotate(${(index - 1) * 8 - 5}deg)` }}
+            >
+              <Image src={image.src} alt="" fill sizes="112px" className="object-cover" />
+            </div>
+          ))}
+        </div>
+
+        <div className="absolute inset-x-0 bottom-7 z-30 flex items-end justify-between gap-5 px-5 sm:px-10">
+          <p className="max-w-[15rem] text-xs leading-5 text-white/45 sm:text-sm sm:leading-6">
+            Concepts, explorations, and interface work from client and product builds.
+          </p>
+          <div className="text-right text-[9px] font-semibold uppercase tracking-[0.2em] text-white/35">
+            Move through the work <span className="ml-2 text-white/65">↘</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CreativeProjectsSection({
   projects,
   galleryImages,
@@ -1611,7 +1780,9 @@ function CreativeProjectsSection({
 }) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const expandedSectionRef = useRef<HTMLElement | null>(null);
-  const [progress, setProgress] = useState(0);
+  const lineARef = useRef<HTMLDivElement | null>(null);
+  const lineBRef = useRef<HTMLDivElement | null>(null);
+  const targetRef = useRef(0);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [showAllGallery, setShowAllGallery] = useState(false);
   const prefersReducedMotion = useReducedMotion();
@@ -1624,51 +1795,6 @@ function CreativeProjectsSection({
     return galleryImages.length > 0 ? galleryImages : fallbackPool;
   }, [galleryImages, projects]);
 
-  const initialGalleryCount = isMobileLayout ? 8 : 12;
-  const remainingGallery = galleryPool.slice(initialGalleryCount);
-
-  const posterPairs = useMemo(() => {
-    const visiblePool = galleryPool.slice(0, initialGalleryCount);
-    if (visiblePool.length === 0) return [];
-    const initialCount = isMobileLayout ? 8 : 12;
-    const paddedPool = visiblePool.length < initialCount
-      ? Array.from({ length: initialCount }, (_, index) => visiblePool[index % visiblePool.length])
-      : visiblePool;
-    const shifted = [...paddedPool.slice(2), ...paddedPool.slice(0, 2)];
-    const itemCount = paddedPool.length;
-    return Array.from({ length: itemCount }, (_, index) => ({
-      initial: shifted[index % shifted.length],
-      final: shifted[(index + 5) % shifted.length],
-    }));
-  }, [galleryPool, initialGalleryCount, isMobileLayout]);
-
-  useEffect(() => {
-    const scroller = containerRef.current;
-    const section = sectionRef.current;
-    if (!scroller || !section) return;
-
-    let frame = 0;
-    let latest = 0;
-    const update = () => {
-      const travel = Math.max(1, section.offsetHeight - scroller.clientHeight);
-      latest = Math.min(1, Math.max(0, (scroller.scrollTop - section.offsetTop) / travel));
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        setProgress(prefersReducedMotion ? 0.45 : latest);
-      });
-    };
-
-    update();
-    scroller.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    return () => {
-      cancelAnimationFrame(frame);
-      scroller.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-    };
-  }, [containerRef, prefersReducedMotion]);
-
   useEffect(() => {
     const query = window.matchMedia('(max-width: 767px)');
     const update = () => setIsMobileLayout(query.matches);
@@ -1677,147 +1803,146 @@ function CreativeProjectsSection({
     return () => query.removeEventListener('change', update);
   }, []);
 
+  const drumCount = isMobileLayout ? 9 : 12;
+  const drumImages = useMemo(
+    () => galleryPool.slice(0, drumCount).map((g) => ({ src: g.src, alt: g.alt })),
+    [galleryPool, drumCount],
+  );
+  const remainingGallery = galleryPool.slice(drumCount);
+  const canToggleGallery = remainingGallery.length > 0;
+
+  /* Scroll feeds raw progress to the drum, which does its own easing in the
+     render loop. The headline eases with the same factor so the two stay in
+     step rather than drifting apart. */
   useEffect(() => {
-    if (!showAllGallery || !isMobileLayout) return;
+    const scroller = containerRef.current;
+    const section = sectionRef.current;
+    if (!scroller || !section) return;
+
+    let raf = 0;
+    let eased = 0;
+
+    const measure = () => {
+      const travel = Math.max(1, section.offsetHeight - scroller.clientHeight);
+      targetRef.current = Math.min(1, Math.max(0, (scroller.scrollTop - section.offsetTop) / travel));
+    };
+
+    // The lines never settle — they travel the whole section. Line A runs left
+    // to right, line B right to left, crossing in the middle. Both overhang
+    // their starting edge and exit past the opposite one.
+    const paintHeadline = (p: number) => {
+      const x = (p * 2 - 1) * window.innerWidth * 0.45;
+      if (lineARef.current) lineARef.current.style.transform = `translate3d(${x.toFixed(1)}px,-50%,0)`;
+      if (lineBRef.current) lineBRef.current.style.transform = `translate3d(${(-x).toFixed(1)}px,-50%,0)`;
+    };
+
+    if (prefersReducedMotion) {
+      measure();
+      paintHeadline(0.35);
+      scroller.addEventListener('scroll', measure, { passive: true });
+      return () => scroller.removeEventListener('scroll', measure);
+    }
+
+    // Lenis smooths the scroll value itself, so paint straight from it.
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      paintHeadline(targetRef.current);
+    };
+
+    measure();
+    eased = targetRef.current;
+    tick();
+    scroller.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      scroller.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, [containerRef, prefersReducedMotion]);
+
+  useEffect(() => {
+    if (!showAllGallery) return;
     const scroller = containerRef.current;
     const expandedSection = expandedSectionRef.current;
     if (!scroller || !expandedSection) return;
-
     const frame = requestAnimationFrame(() => {
-      const revealOffset = Math.min(100, scroller.clientHeight * 0.13);
-      const targetTop = expandedSection.offsetTop - revealOffset;
-      scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      scroller.scrollTo({ top: Math.max(0, expandedSection.offsetTop - 80), behavior: 'smooth' });
     });
-
     return () => cancelAnimationFrame(frame);
-  }, [containerRef, isMobileLayout, showAllGallery]);
-
-  const ease = progress * progress * (3 - 2 * progress);
-  const entranceRaw = Math.min(1, Math.max(0, (ease + 0.16) / 0.3));
-  const entrance = entranceRaw * entranceRaw * (3 - 2 * entranceRaw);
-  const fillRaw = Math.min(1, Math.max(0, (ease - 0.18) / 0.58));
-  const fill = fillRaw * fillRaw * (3 - 2 * fillRaw);
-  const headingOpacity = Math.max(0, 1 - fill * 1.25);
-  const horizontalDrift = -24 + entrance * 24 + ease * 20;
-  const mobileWallPanRaw = Math.min(1, Math.max(0, (fill - 0.72) / 0.28));
-  const mobileWallPan = mobileWallPanRaw * mobileWallPanRaw * (3 - 2 * mobileWallPanRaw) * 38;
-  const galleryCount = galleryPool.length;
-  const canToggleGallery = galleryCount > initialGalleryCount;
+  }, [containerRef, showAllGallery]);
 
   return (
     <>
-    <section ref={sectionRef} id="more-work" className="relative h-[170svh] bg-[#06080d] md:h-[218svh]">
-      <div className="sticky top-0 h-screen overflow-hidden bg-black">
-        <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_45%_30%_at_50%_50%,rgba(255,255,255,0.06),transparent_74%)]" />
-
-        <div
-          className="pointer-events-none absolute inset-x-0 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center justify-center px-5 text-center"
-          style={{
-            opacity: headingOpacity,
-            willChange: 'transform, opacity',
-            transform: `translate3d(0, calc(-50% + ${(-fill * 28).toFixed(2)}px), 0)`,
-          }}
-        >
-          <CreativeHeadingReveal />
-        </div>
-
-        <div className="absolute inset-0 z-10">
-          {/* On mobile cap at 6 tiles — reduces layout/composite work per frame */}
-          {(isMobileLayout ? posterPairs.slice(0, 6) : posterPairs).map((pair, index) => {
-            const activePairs = isMobileLayout ? Math.min(6, posterPairs.length) : posterPairs.length;
-            const bandSize = isMobileLayout ? Math.ceil(activePairs / 2) : 6;
-            const isTopBand = index < bandSize;
-            const bandIndex = index % bandSize;
-            const finalColumns = isMobileLayout ? 2 : 4;
-            const finalRows = Math.ceil(activePairs / finalColumns);
-            const finalCol = index % finalColumns;
-            const finalRow = Math.floor(index / finalColumns);
-            const rowTravel = isMobileLayout ? 22 : 34;
-            const rowEnter = (isTopBand ? -rowTravel : rowTravel) * (1 - entrance);
-            const movingGap = 0.42 * (1 - fill);
-            const revealColGap = 0.12 * fill;
-            const revealRowGap = finalRows > 3 ? 1.6 * fill : 4.1 * fill;
-            const initialX = isMobileLayout
-              ? -8 + bandIndex * (46 + movingGap * 8) + horizontalDrift * 0.42 + (isTopBand ? 0 : -10)
-              : -9 + bandIndex * (19.7 + movingGap) + horizontalDrift + (isTopBand ? 0 : -7);
-            const initialY = (isTopBand ? (isMobileLayout ? 24 : 10) : (isMobileLayout ? 54 : 56)) + rowEnter;
-            const finalX = isMobileLayout ? 2.2 + finalCol * 50.25 : 4.5 + finalCol * (23.05 + revealColGap);
-            const mobileWallPanDistance = isMobileLayout && finalRows > 4 ? mobileWallPan : 0;
-            const finalY = isMobileLayout
-              ? 7 + finalRow * (finalRows > 2 ? 20 : 42) - mobileWallPanDistance
-              : 3.8 + finalRow * ((88 / finalRows) + revealRowGap);
-            const positionFill = isMobileLayout ? Math.min(1, fill * 1.08) : fill;
-            const x = initialX + (finalX - initialX) * positionFill;
-            const y = initialY + (finalY - initialY) * positionFill;
-            const scale = isMobileLayout ? 1 : 0.98 + fill * 0.08;
-            const opacity = isMobileLayout ? 0.34 + entrance * 0.42 + fill * 0.2 : 0.08 + entrance * 0.66 + fill * 0.26;
-            const tileWidth = isMobileLayout ? 'calc((94vw - 1rem) / 2)' : 'clamp(12rem, 20vw, 23rem)';
-            const tileHeight = isMobileLayout
-              ? 'clamp(7.25rem, 17vh, 9.4rem)'
-              : finalRows > 3 ? 'clamp(9.6rem, 22vh, 16.5rem)' : 'clamp(10rem, 24vh, 14rem)';
-            return (
-              <div
-                key={`${pair.initial.title}-${index}`}
-                style={{
-                  position: 'absolute',
-                  left: `${x.toFixed(3)}%`,
-                  top: `${y.toFixed(3)}%`,
-                  width: tileWidth,
-                  height: tileHeight,
-                  opacity,
-                  willChange: 'transform, opacity',
-                  transform: `translate3d(0,0,0) scale(${scale.toFixed(4)})`,
-                }}
-              >
-                <CreativeMorphPoster initial={pair.initial} final={pair.final} index={index} progress={fill} />
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-40 h-32 bg-gradient-to-b from-[#06080d] via-black/78 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-16 bg-gradient-to-t from-[#06080d] via-black/78 to-transparent md:h-32" />
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-40 w-28 bg-gradient-to-r from-black to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-40 w-28 bg-gradient-to-l from-black to-transparent" />
-        {canToggleGallery && !showAllGallery && (
-          <button
-            type="button"
-            onClick={() => setShowAllGallery(true)}
-            className="absolute bottom-[clamp(7rem,17vh,9rem)] left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/[0.09] bg-[#0d0f14]/80 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/65 shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_0_0_0.5px_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:border-white/20 hover:text-white md:bottom-7"
-            style={{ opacity: Math.max(0.3, fill) }}
-          >
-            Show more ({galleryCount - initialGalleryCount})
-            <ArrowDown className="size-3" />
-          </button>
-        )}
-      </div>
-    </section>
-    {showAllGallery && remainingGallery.length > 0 && (
-      <section ref={expandedSectionRef} className="relative z-20 -mt-[clamp(9rem,25vh,13rem)] bg-[#06080d] pb-20 pt-0 md:mt-0 md:pb-24">
-        <div className="mx-auto w-[94vw] pt-0 md:w-[92vw] md:pt-5 lg:w-[92.2vw]">
+      <section ref={sectionRef} id="more-work" className="relative h-[300svh] md:h-[340svh]">
+        <div className="sticky top-0 h-screen overflow-hidden">
+          {/* Split headline: left line high, caption between, right line low.
+              Both slide inward from the edges and settle — they do not cross. */}
           <div
-            className="grid grid-cols-2 gap-4 sm:gap-3 md:gap-4"
-            style={{
-              gridTemplateColumns: isMobileLayout ? undefined : 'repeat(4, minmax(0, 1fr))',
-            }}
+            ref={lineARef}
+            className="pointer-events-none absolute inset-x-0 top-[39%] z-10 will-change-transform px-5 text-left text-[clamp(2.5rem,7.5vw,7rem)] font-light leading-[0.86] tracking-[-0.055em] text-white/[0.16] sm:px-10"
           >
-            {remainingGallery.map((image, index) => (
-              <ExpandedGalleryTile key={`${image.src}-${index}`} image={image} />
-            ))}
+            MORE THINGS
           </div>
-          <div className="mt-7 flex justify-center">
-            <button
-              type="button"
-              onClick={() => setShowAllGallery(false)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/[0.09] bg-[#0d0f14]/80 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/65 shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_0_0_0.5px_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:border-white/20 hover:text-white"
-            >
-              Show less
-              <ArrowUp className="size-3" />
-            </button>
+
+          <div className="pointer-events-none absolute inset-x-0 top-[49%] z-20 -translate-y-1/2 text-center text-[10px] font-semibold uppercase leading-relaxed tracking-[0.2em] text-white/45">
+            Screens and interfaces
+            <br />
+            from projects I&apos;ve shipped.
+          </div>
+
+          <div
+            ref={lineBRef}
+            className="pointer-events-none absolute inset-x-0 top-[59%] z-10 will-change-transform px-5 text-right text-[clamp(2.5rem,7.5vw,7rem)] font-light leading-[0.86] tracking-[-0.055em] text-white/[0.16] sm:px-10"
+          >
+            I&apos;VE BUILT
+          </div>
+
+          <CreativeDrum
+            images={drumImages}
+            targetRef={targetRef}
+            className="pointer-events-none absolute inset-0 z-30"
+          />
+
+          <div className="absolute inset-x-0 bottom-8 z-40 flex flex-col gap-6 px-5 sm:px-10 md:flex-row md:items-end md:justify-between">
+            <p className="max-w-xs text-sm leading-6 text-white/50">
+              Concepts, explorations, and interface work from client and product builds.
+            </p>
+            {canToggleGallery && !showAllGallery && (
+              <button
+                type="button"
+                onClick={() => setShowAllGallery(true)}
+                className="inline-flex w-max cursor-pointer items-center gap-3 border-b border-white/25 pb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70 transition hover:border-white hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+              >
+                View more ({remainingGallery.length})
+                <ArrowDown className="size-3" />
+              </button>
+            )}
           </div>
         </div>
       </section>
-    )}
+
+      {showAllGallery && remainingGallery.length > 0 && (
+        <section ref={expandedSectionRef} className="relative z-20 pb-20 pt-4 md:pb-24">
+          <div className="mx-auto w-[94vw] md:w-[92vw]">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {remainingGallery.map((image, index) => (
+                <ExpandedGalleryTile key={`${image.src}-${index}`} image={image} />
+              ))}
+            </div>
+            <div className="mt-7 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAllGallery(false)}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/[0.09] bg-[#0d0f14]/80 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/65 backdrop-blur-xl transition hover:border-white/20 hover:text-white"
+              >
+                Show less
+                <ArrowUp className="size-3" />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
     </>
   );
 }
@@ -1913,11 +2038,11 @@ function CreativeMorphPoster({
 }
 
 function CreativeHeadingReveal() {
-  const words = ['Crafted', 'with', 'real', 'intent'];
+  const words = ['More', 'things', "I've", 'built'];
 
   return (
     <motion.h2
-      aria-label="Crafted with real intent"
+      aria-label="More things I've built"
       className="text-balance text-5xl font-light leading-[0.92] tracking-[-0.06em] text-white sm:text-7xl"
       initial="hidden"
       whileInView="show"
@@ -2108,9 +2233,9 @@ function TestimonialsSection({
             Testimonials
           </div>
           <h2 className="text-balance text-5xl font-light tracking-[-0.055em] text-white lg:text-6xl">
-            <span className="font-serif italic text-white/55">Hear from clients</span>
+            <span className="font-serif italic text-white/55">What it&apos;s like</span>
             <br />
-            I&apos;ve worked with
+            to work with me.
           </h2>
         </motion.div>
 
@@ -2254,11 +2379,11 @@ function PluginBuildsSection({ plugins }: { plugins: Plugin[] }) {
                 ))}
               </div>
 
-              {/* Git icon — mobile: bottom of column */}
-              <GitBranch className="size-[22px] shrink-0 text-white/45 md:hidden" />
-
-              {/* Git icon — desktop: end of row */}
-              <GitBranch className="ml-3 hidden size-[18px] shrink-0 text-white/45 md:block" />
+              {/* Git icon — circled chip; right-aligned on mobile, end of row
+                  on desktop */}
+              <span className="inline-flex size-11 shrink-0 items-center justify-center self-start rounded-full border border-white/20 text-white/55 transition-colors duration-300 group-hover:border-white/55 group-hover:text-white md:ml-3 md:size-12 md:self-auto">
+                <GitBranch className="size-5" />
+              </span>
             </motion.a>
           ))}
         </div>
@@ -2518,7 +2643,7 @@ function ContactSection() {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="text-balance text-5xl font-light leading-[0.95] tracking-[-0.055em] sm:text-7xl"
           >
-            Let&apos;s build something precise.
+            Tell me what you&apos;re building.
           </motion.h2>
           <motion.div
             variants={fadeUp}
@@ -2642,7 +2767,7 @@ function Footer() {
   return (
     <footer className="mx-auto flex max-w-7xl flex-col gap-3 border-t border-white/10 px-5 py-8 text-[10px] uppercase tracking-[0.18em] text-white/32 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
       <span>© {new Date().getFullYear()} Shoaib Qureshi / Bengaluru, India</span>
-      <span>Designed and built with cinematic restraint</span>
+      <span>Next.js · Tailwind · GSAP</span>
     </footer>
   );
 }

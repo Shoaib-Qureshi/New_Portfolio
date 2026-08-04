@@ -8,7 +8,13 @@ import { getClientIp, lookupGeo, parseUserAgent } from '@/lib/request-meta';
 
 export const runtime = 'nodejs';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+// Serverless filesystems are read-only outside /tmp. Writing under process.cwd()
+// there throws, which used to fail the whole request. Same rule content-store.ts
+// already follows — keep the two in step.
+const IS_SERVERLESS = Boolean(
+  process.env.VERCEL || process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME,
+);
+const DATA_DIR = IS_SERVERLESS ? '/tmp/portfolio-data' : path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'portfolio.sqlite');
 
 function ensureTable() {
@@ -38,9 +44,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
 
-    const db = ensureTable();
-    db.prepare('insert into contacts (name, email, message) values (?, ?, ?)').run(name, email, message);
-    db.close();
+    // Best-effort archive. Nothing reads this table today, and on serverless
+    // /tmp is wiped between cold starts — so a storage failure must never block
+    // the email, which is the actual delivery path.
+    let archived = false;
+    try {
+      const db = ensureTable();
+      db.prepare('insert into contacts (name, email, message) values (?, ?, ?)').run(name, email, message);
+      db.close();
+      archived = true;
+    } catch (dbError) {
+      console.error('[contact] Archive write failed:', dbError);
+    }
 
     // Gather request metadata for the admin email (date, IP, country, browser, device).
     const ua = req.headers.get('user-agent') ?? '';
@@ -66,8 +81,9 @@ export async function POST(req: NextRequest) {
 
     // Best-effort email notification. The message is already saved above, so a
     // mail failure never loses a submission — we just log it and still return ok.
+    let emailed = false;
     try {
-      const emailed = await sendContactEmail({ name, email, message }, meta);
+      emailed = await sendContactEmail({ name, email, message }, meta);
       if (!emailed) {
         console.warn(
           '[contact] Email NOT sent: mailer not configured. Set GOOGLE_REFRESH_TOKEN in .env.local ' +
@@ -80,8 +96,16 @@ export async function POST(req: NextRequest) {
       console.error('[contact] Email failed to send:', mailError);
     }
 
+    // The archive is ephemeral on serverless, so only a sent email counts as
+    // delivery there. Returning ok when the message reached nobody loses it
+    // silently — better the visitor sees the "email me directly" fallback.
+    if (!emailed && (IS_SERVERLESS || !archived)) {
+      return NextResponse.json({ error: 'Could not deliver message' }, { status: 502 });
+    }
+
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error('[contact] Request failed:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
