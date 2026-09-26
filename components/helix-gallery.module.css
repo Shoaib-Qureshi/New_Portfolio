@@ -1,0 +1,179 @@
+.section {
+  position: relative;
+  height: 560svh;
+  background: #bcbcbc;
+  color: #272724;
+}
+
+.stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  background: #bcbcbc;
+}
+
+.headline {
+  position: absolute;
+  inset: 34% 10% auto;
+  z-index: 0;
+  margin: 0;
+  font-size: clamp(46px, 7.3vw, 150px);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.075em;
+  word-spacing: 0.14em;
+}
+
+.headline span {
+  display: block;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.headline span:last-child {
+  margin-top: 0.4em;
+  text-align: right;
+}
+
+.kicker {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(8px, 0.65vw, 11px);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  text-align: center;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+}
+
+.grid {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1.1vw, 22px);
+  width: min(80vw, calc((100svh - 250px) * 2.08));
+  transform: translate(-50%, -50%);
+}
+
+.tile {
+  position: relative;
+  display: block;
+  aspect-ratio: 10 / 7;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #aaa;
+  color: white;
+}
+
+.tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.caption {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 36px 16px 16px;
+  background: linear-gradient(transparent, #000b);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 200ms, transform 200ms;
+}
+
+.caption svg { flex-shrink: 0; }
+.tile:hover .caption, .tile:focus-visible .caption { opacity: 1; transform: none; }
+.tile:focus-visible, .footer button:focus-visible { outline: 2px solid #252522; outline-offset: 5px; }
+.tile:focus-visible { overflow: visible; }
+a.tile { cursor: pointer; }
+
+.footer {
+  position: absolute;
+  inset: auto 2.5% 7%;
+  z-index: 3;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  pointer-events: none;
+}
+
+.footer p { margin: 0; font-size: clamp(11px, 1.04vw, 16px); line-height: 1.35; letter-spacing: -0.04em; }
+.footer button { cursor: pointer; pointer-events: auto; color: inherit; }
+.browse { display: inline-flex; align-items: center; gap: 16px; padding: 8px 0; border-bottom: 1px solid #27272480; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.browse:hover { border-color: currentColor; }
+.pagination { display: flex; align-items: center; gap: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+.pagination button { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid #27272445; border-radius: 50%; transition: background 180ms; }
+.pagination button:hover { background: #27272415; }
+.scrollHint { position: absolute; inset: auto 0 2.5%; display: flex; justify-content: center; align-items: center; gap: 7px; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.07em; pointer-events: none; }
+
+.static { height: auto; }
+.static .stage { position: relative; min-height: 100svh; height: auto; padding: 110px 0 35px; }
+.static .headline { position: relative; inset: auto; width: 80%; margin: 0 auto 40px; font-size: clamp(35px, 5vw, 85px); opacity: 1 !important; }
+.static .headline span { transform: none !important; }
+.static .kicker { display: none; }
+.static .grid { position: relative; top: auto; left: auto; width: 80%; margin: 0 auto; transform: none; }
+.static .footer { position: relative; inset: auto; margin: 35px 5% 0; }
+
+:global(body):has(.section[data-in-view='true']) :global(header button),
+:global(body):has(.section[data-in-view='true']) :global(header button svg) {
+  color: #272724;
+}
+
+:global(body):has(.section[data-in-view='true']) :global(header .glass) {
+  background: #bcbcbcbd;
+  border-color: #27272426;
+  box-shadow: none;
+}
+
+:global(body):has(.section[data-in-view='true']) :global([data-visual-ignore='true']) {
+  --accent: #272724;
+  --accent-rgb: 39, 39, 36;
+  --border: #27272466;
+  --accent-soft: #2727240a;
+}
+
+@media (max-width: 767px) {
+  .section { height: 480svh; }
+  .headline { inset: 39% 5% auto; font-size: 9.2vw; }
+  .headline span:last-child { margin-top: 1.15em; }
+  .kicker { top: 48.5%; font-size: 8px; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(90vw, calc((100svh - 210px) * 0.89)); gap: 10px; }
+  .footer { inset: auto 5% 6%; gap: 12px; }
+  .footer p { max-width: 180px; font-size: 10px; }
+  .browse { font-size: 10px; gap: 6px; }
+  .pagination { gap: 7px; }
+  .pagination button { width: 38px; height: 44px; }
+  .caption { padding: 22px 9px 9px; font-size: 10px; }
+  .static { height: auto; }
+  .static .grid { width: 90%; }
+  .static .headline { width: 90%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caption, .pagination button { transition: none; }
+}
