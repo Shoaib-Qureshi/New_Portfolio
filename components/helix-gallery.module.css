@@ -1,7 +1,7 @@
 .section {
   position: relative;
-  height: 560svh;
-  background: #bcbcbc;
+  height: 740svh;
+  background: var(--background, #06080d);
   color: #272724;
 }
 
@@ -12,6 +12,41 @@
   overflow: hidden;
   isolation: isolate;
   background: #bcbcbc;
+}
+
+.wipe {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-rows: repeat(6, 1fr);
+  pointer-events: none;
+}
+
+.stripe {
+  background: var(--background, #06080d);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  will-change: transform;
+  /* A small overlap prevents subpixel seams when the wipe closes. */
+  margin-top: -1px;
+}
+
+/* The next section rises through the lower, already-covered stripes. */
+.section:not(.static) + :global(section) {
+  position: relative;
+  z-index: 1;
+  margin-top: -60svh;
+  /* Keep the stripe handoff opaque, then reveal the shared backdrop gradually
+     so the next section's haze doesn't start at a hard horizontal edge. */
+  background: linear-gradient(
+    to bottom,
+    var(--background, #06080d) 0%,
+    var(--background, #06080d) calc(100% - 240px),
+    rgba(6, 8, 13, 0.85) calc(100% - 170px),
+    rgba(6, 8, 13, 0.35) calc(100% - 70px),
+    transparent 100%
+  );
 }
 
 .headline {
@@ -139,18 +174,18 @@ a.tile { cursor: pointer; }
 .static .grid { position: relative; top: auto; left: auto; width: 80%; margin: 0 auto; transform: none; }
 .static .footer { position: relative; inset: auto; margin: 35px 5% 0; }
 
-:global(body):has(.section[data-in-view='true']) :global(header button),
-:global(body):has(.section[data-in-view='true']) :global(header button svg) {
+:global(body):has(.section[data-in-view='true']:not([data-exit-dark='true'])) :global(header button),
+:global(body):has(.section[data-in-view='true']:not([data-exit-dark='true'])) :global(header button svg) {
   color: #272724;
 }
 
-:global(body):has(.section[data-in-view='true']) :global(header .glass) {
+:global(body):has(.section[data-in-view='true']:not([data-exit-dark='true'])) :global(header .glass) {
   background: #bcbcbcbd;
   border-color: #27272426;
   box-shadow: none;
 }
 
-:global(body):has(.section[data-in-view='true']) :global([data-visual-ignore='true']) {
+:global(body):has(.section[data-in-view='true']:not([data-exit-dark='true'])) :global([data-visual-ignore='true']) {
   --accent: #272724;
   --accent-rgb: 39, 39, 36;
   --border: #27272466;
@@ -158,7 +193,7 @@ a.tile { cursor: pointer; }
 }
 
 @media (max-width: 767px) {
-  .section { height: 480svh; }
+  .section { height: 620svh; }
   .headline { inset: 39% 5% auto; font-size: 9.2vw; }
   .headline span:last-child { margin-top: 1.15em; }
   .kicker { top: 48.5%; font-size: 8px; }

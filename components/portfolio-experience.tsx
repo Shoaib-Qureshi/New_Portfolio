@@ -806,7 +806,12 @@ function AboutSection({
     'That means frontend engineering, CMS architecture, and AI workflows in the same project — documentation pipelines, editorial tooling, and admin systems a client can run without calling me.';
 
   return (
-    <section ref={sectionRef} id="about" className="relative scroll-mt-20 bg-[#06080d]">
+    <section
+      ref={sectionRef}
+      id="about"
+      className="relative scroll-mt-20"
+      style={{ background: 'linear-gradient(to bottom, #06080d 0%, #06080d calc(100% - 220px), rgba(6,8,13,0.85) calc(100% - 160px), rgba(6,8,13,0.35) calc(100% - 70px), transparent 100%)' }}
+    >
       <div className="relative h-[330svh] md:h-[190svh]">
         <div className="sticky top-0 flex h-[100svh] items-start overflow-hidden pt-28 md:items-center md:pt-0">
           <div aria-hidden="true" className="absolute inset-0 opacity-70">
@@ -1070,6 +1075,16 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
 
   return (
     <section id="work" className="relative mx-auto max-w-7xl scroll-mt-20 overflow-hidden px-5 pb-4 pt-4 sm:px-8 sm:pt-24 lg:px-10 lg:py-32">
+      {/* Fade the decorative layers in at the section edge while the shared
+          backdrop continues through from About. Content stays unmasked. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 mix-blend-lighten"
+        style={{
+          maskImage: 'linear-gradient(to bottom, transparent, black 160px)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 160px)',
+        }}
+      >
       {/* `opacity` + `transform` below isolate this group, so the canvas' own
           blend mode can't reach the page. Blend the whole group instead — that
           drops the Spline's opaque black clear colour against the backdrop. */}
@@ -1086,6 +1101,7 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
         // elliptical mask already handles its edges. Soft accent glows kept.
         className="pointer-events-none absolute inset-x-[-16%] top-[-4rem] z-[1] h-[54rem] bg-[radial-gradient(ellipse_32%_28%_at_34%_38%,rgba(var(--accent-rgb),0.04),transparent_74%),radial-gradient(ellipse_24%_22%_at_32%_44%,rgba(255,122,47,0.036),transparent_78%)]"
       />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 36 }}
         whileInView={{ opacity: 1, y: 0 }}

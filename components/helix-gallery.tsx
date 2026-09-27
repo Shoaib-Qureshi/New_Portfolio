@@ -4,7 +4,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import * as THREE from 'three';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GalleryImage } from '@/lib/content-types';
 import styles from './helix-gallery.module.css';
 
@@ -25,6 +25,10 @@ const PATH_START = 4.1;
 const PATH_END = Math.PI * 3.5;
 const PITCH = 1.7;
 const HELIX_END = 0.77;
+// Reserve the final scroll range for reading the grid, then the stripe exit.
+const SCENE_END = 0.72;
+const WIPE_START = 0.82;
+const STRIPE_COUNT = 6;
 const SEGMENTS = 40;
 const GUIDE_POINTS = 240;
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
@@ -50,16 +54,81 @@ export function HelixGallerySection({ images, containerRef }: {
   const gridRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLHeadingElement>(null);
   const kickerRef = useRef<HTMLParagraphElement>(null);
+  const wipeRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<ScrollTrigger | null>(null);
   const gridVisible = useRef(false);
   const [gridShown, setGridShown] = useState(false);
+  const [wiping, setWiping] = useState(false);
   const [reducedMotion, setReducedMotion] = useState<boolean | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [page, setPage] = useState(0);
+  const [paging, setPaging] = useState(false);
+  const pageTween = useRef<gsap.core.Tween | null>(null);
+  const pageDirection = useRef(0);
   const staticLayout = reducedMotion === true || unavailable;
   const pageCount = Math.max(1, Math.ceil(images.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
   const tiles = images.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+  // Cancel pagination when scroll takes control of the gallery again.
+  useLayoutEffect(() => {
+    const grid = gridRef.current;
+    const reset = () => {
+      pageTween.current?.kill();
+      pageTween.current = null;
+      pageDirection.current = 0;
+      if (grid) gsap.set(grid.children, { clearProps: 'transform,opacity,willChange' });
+    };
+    reset();
+    setPaging(false);
+    return reset;
+  }, [gridShown, staticLayout, wiping, reducedMotion, images]);
+
+  // React swaps the images only after the outgoing tiles have disappeared.
+  // Start the incoming motion before paint to avoid a flash of the new page.
+  useLayoutEffect(() => {
+    const direction = pageDirection.current;
+    const grid = gridRef.current;
+    if (!direction || !grid) return;
+    pageTween.current = gsap.fromTo(grid.children,
+      { x: direction * 48, y: 18, scale: 0.97, opacity: 0, willChange: 'transform,opacity' },
+      {
+        x: 0, y: 0, scale: 1, opacity: 1,
+        duration: 0.46,
+        stagger: { each: 0.035, from: direction > 0 ? 'start' : 'end' },
+        ease: 'power3.out',
+        onComplete: () => {
+          gsap.set(grid.children, { clearProps: 'transform,opacity,willChange' });
+          pageTween.current = null;
+          pageDirection.current = 0;
+          setPaging(false);
+        },
+      },
+    );
+  }, [currentPage]);
+
+  const changePage = (direction: number) => {
+    if (pageDirection.current || wiping || pageCount < 2) return;
+    const nextPage = (currentPage + direction + pageCount) % pageCount;
+    const grid = gridRef.current;
+    if (reducedMotion || !grid) { setPage(nextPage); return; }
+    // Warm the next images while the current page slides out.
+    images.slice(nextPage * PAGE_SIZE, (nextPage + 1) * PAGE_SIZE).forEach(image => {
+      const preload = new window.Image();
+      preload.src = image.src;
+    });
+    pageDirection.current = direction;
+    setPaging(true);
+    pageTween.current = gsap.to(grid.children, {
+      x: direction * -36, y: -10, scale: 0.98, opacity: 0,
+      willChange: 'transform,opacity',
+      duration: 0.2,
+      stagger: { each: 0.025, from: direction > 0 ? 'start' : 'end' },
+      ease: 'power2.in',
+      onComplete: () => setPage(nextPage),
+    });
+  };
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -109,6 +178,8 @@ export function HelixGallerySection({ images, containerRef }: {
     let ticking = false;
     let dirty = true;
     let progress = 0;
+    let exitProgress = 0;
+    let wasWiping = false;
     let hovered = -1;
     let lastTime = 0;
     let width = 1;
@@ -210,6 +281,23 @@ export function HelixGallerySection({ images, containerRef }: {
     };
 
     const paint = (dt: number) => {
+      // Each band grows from its lower edge. Lower bands close first, then
+      // the following section scrolls over the completed dark part.
+      const stripes = wipeRef.current?.children;
+      if (stripes) {
+        for (let index = 0; index < stripes.length; index++) {
+          const delay = (STRIPE_COUNT - 1 - index) * 0.105;
+          const amount = smooth((exitProgress - delay) / (1 - delay));
+          (stripes[index] as HTMLElement).style.transform = `scaleY(${amount})`;
+        }
+      }
+      if (footerRef.current) footerRef.current.style.opacity = String(1 - smooth(exitProgress / 0.2));
+      section.dataset.exitDark = String(exitProgress > 0.9);
+      const isWiping = exitProgress > 0;
+      if (isWiping !== wasWiping) {
+        wasWiping = isWiping;
+        setWiping(isWiping);
+      }
       const travel = clamp(progress / HELIX_END);
       // Spend more of the scroll on the close pass. This smooth, monotonic
       // driver keeps the rear entry/exit brief without pausing or resetting.
@@ -286,8 +374,8 @@ export function HelixGallerySection({ images, containerRef }: {
         if (!showGrid) setPage(0);
         setGridShown(showGrid);
       }
-      stage.dataset.phase = showGrid ? 'grid' : progress >= 0.77 ? 'unfold' : 'helix';
-      renderer.render(scene, camera);
+      stage.dataset.phase = isWiping ? 'wipe' : showGrid ? 'grid' : progress >= 0.77 ? 'unfold' : 'helix';
+      if (!showGrid) renderer.render(scene, camera);
       return settling;
     };
 
@@ -338,8 +426,16 @@ export function HelixGallerySection({ images, containerRef }: {
       start: 'top top',
       end: 'bottom bottom',
       invalidateOnRefresh: true,
-      onUpdate: self => { progress = self.progress; wake(); },
-      onRefresh: self => { progress = self.progress; resize(); },
+      onUpdate: self => {
+        progress = clamp(self.progress / SCENE_END);
+        exitProgress = clamp((self.progress - WIPE_START) / (1 - WIPE_START));
+        wake();
+      },
+      onRefresh: self => {
+        progress = clamp(self.progress / SCENE_END);
+        exitProgress = clamp((self.progress - WIPE_START) / (1 - WIPE_START));
+        resize();
+      },
     });
     triggerRef.current = trigger;
     const observer = new IntersectionObserver(([entry]) => {
@@ -377,6 +473,9 @@ export function HelixGallerySection({ images, containerRef }: {
 
     return () => {
       disposed = true;
+      delete section.dataset.exitDark;
+      setWiping(false);
+      if (footerRef.current) footerRef.current.style.opacity = '1';
       gsap.ticker.remove(tick);
       trigger.kill();
       triggerRef.current = null;
@@ -396,7 +495,7 @@ export function HelixGallerySection({ images, containerRef }: {
   const browse = () => {
     const trigger = triggerRef.current;
     if (!trigger || !containerRef.current) return;
-    containerRef.current.scrollTop = trigger.end - 1;
+    containerRef.current.scrollTop = trigger.start + (trigger.end - trigger.start) * ((SCENE_END + WIPE_START) / 2);
     ScrollTrigger.update();
   };
 
@@ -404,29 +503,32 @@ export function HelixGallerySection({ images, containerRef }: {
   const visible = staticLayout || gridShown;
   return (
     <section ref={sectionRef} id="more-work" aria-label="More things I've built" className={`${styles.section} ${staticLayout ? styles.static : ''}`}>
-      <div ref={stageRef} className={styles.stage} data-phase={visible ? 'grid' : 'helix'}>
+      <div ref={stageRef} className={styles.stage} data-phase={wiping && !staticLayout ? 'wipe' : visible ? 'grid' : 'helix'}>
         <h2 ref={headlineRef} className={styles.headline}>
           <span>MORE THINGS</span>
           <span>I&apos;VE BUILT</span>
         </h2>
         <p ref={kickerRef} className={styles.kicker}>EXPLORING IDEAS THROUGH<br />CRAFT AND CODE.</p>
         {!staticLayout && <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" style={{ visibility: gridShown ? 'hidden' : 'visible' }} />}
-        <div ref={gridRef} className={styles.grid} aria-hidden={!visible} inert={!visible} style={{ visibility: visible ? 'visible' : 'hidden' }}>
+        <div ref={gridRef} className={styles.grid} aria-busy={paging} aria-hidden={!visible || (wiping && !staticLayout)} inert={paging || !visible || (wiping && !staticLayout)} style={{ visibility: visible ? 'visible' : 'hidden' }}>
           {tiles.map((image, index) => <GalleryTile key={`${currentPage}-${index}-${image.src}`} image={image} />)}
         </div>
-        <div className={styles.footer}>
+        <div ref={footerRef} className={styles.footer} inert={wiping && !staticLayout}>
           <p>Dashboards, storefronts, and product sites.<br />Ideas taken from brief to production.</p>
           {visible ? (
             <div className={styles.pagination}>
               {pageCount > 1 && <>
-                <button type="button" onClick={() => setPage((currentPage - 1 + pageCount) % pageCount)} aria-label="Previous gallery page"><ArrowLeft size={16} /></button>
+                <button type="button" onClick={() => changePage(-1)} aria-disabled={paging} aria-label="Previous gallery page"><ArrowLeft size={16} /></button>
                 <span aria-live="polite">{String(currentPage + 1).padStart(2, '0')} / {String(pageCount).padStart(2, '0')}</span>
-                <button type="button" onClick={() => setPage((currentPage + 1) % pageCount)} aria-label="Next gallery page"><ArrowRight size={16} /></button>
+                <button type="button" onClick={() => changePage(1)} aria-disabled={paging} aria-label="Next gallery page"><ArrowRight size={16} /></button>
               </>}
             </div>
           ) : <button type="button" className={styles.browse} onClick={browse}>VIEW ALL WORK <ArrowUpRight size={17} /></button>}
         </div>
         {!visible && <div className={styles.scrollHint} aria-hidden="true"><ArrowDown size={13} /> SCROLL TO EXPLORE</div>}
+        {!staticLayout && <div ref={wipeRef} className={styles.wipe} aria-hidden="true">
+          {Array.from({ length: STRIPE_COUNT }, (_, index) => <div key={index} className={styles.stripe} />)}
+        </div>}
       </div>
     </section>
   );
