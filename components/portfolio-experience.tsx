@@ -71,38 +71,10 @@ const MOUSE_SPRING = { stiffness: 80, damping: 22 };
 export function PortfolioExperience({ content }: { content: PortfolioContent }) {
   const [active, setActive] = useState<SectionId>('hero');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [loaderValue, setLoaderValue] = useState(0);
-  const [loaderVisible, setLoaderVisible] = useState(true);
   const [introComplete, setIntroComplete] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const lenisRef = useRef<Lenis | null>(null);
-
-  useEffect(() => {
-    const duration = 900;
-    const startedAt = performance.now();
-    let frame = 0;
-    let timeout = 0;
-
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setLoaderValue(Math.round(eased * 100));
-
-      if (progress < 1) {
-        frame = requestAnimationFrame(tick);
-      } else {
-        setIntroComplete(true);
-        timeout = window.setTimeout(() => setLoaderVisible(false), 80);
-      }
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.clearTimeout(timeout);
-    };
-  }, []);
 
   useEffect(() => {
     const root = containerRef.current;
@@ -184,7 +156,7 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
       </a>
       <HorizonField />
       <div className="noise" />
-      <IntroLoader value={loaderValue} visible={loaderVisible} />
+      <IntroLoader onComplete={() => setIntroComplete(true)} />
       <CustomCursor />
       <FloatingNav active={active} onNavigate={scrollTo} menuOpen={menuOpen} setMenuOpen={setMenuOpen} hiddenSections={content.siteSettings.hiddenSections} />
       <div
@@ -225,13 +197,40 @@ export function PortfolioExperience({ content }: { content: PortfolioContent }) 
   );
 }
 
-function IntroLoader({
-  value,
-  visible,
-}: {
-  value: number;
-  visible: boolean;
-}) {
+// Owns its own counter state so the 60fps count re-renders only the loader,
+// not the whole page tree.
+function IntroLoader({ onComplete }: { onComplete: () => void }) {
+  const [value, setValue] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  useEffect(() => {
+    const duration = 900;
+    const startedAt = performance.now();
+    let frame = 0;
+    let timeout = 0;
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(eased * 100));
+
+      if (progress < 1) {
+        frame = requestAnimationFrame(tick);
+      } else {
+        onCompleteRef.current();
+        timeout = window.setTimeout(() => setVisible(false), 80);
+      }
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, []);
+
   return (
     <AnimatePresence>
       {visible && (

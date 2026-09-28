@@ -162,12 +162,16 @@ export function HorizonField({ className }: { className?: string }) {
 
       ctx.clearRect(0, 0, width, height);
 
+      // White dots vary only in alpha: set the colour once and drive globalAlpha,
+      // instead of building and parsing an rgba() string per dot per frame.
+      ctx.fillStyle = '#fff';
+
       /* Stars — the deepest layer, barely moving. */
       for (const star of stars) {
         star.twinkle += 0.012 * dt;
         const a = 0.2 + Math.sin(star.twinkle) * 0.13;
         if (a <= 0) continue;
-        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.globalAlpha = a;
         ctx.beginPath();
         ctx.arc(star.x - easedX * 8, star.fy * horizon - easedY * 6, star.r, 0, Math.PI * 2);
         ctx.fill();
@@ -194,11 +198,12 @@ export function HorizonField({ className }: { className?: string }) {
           (0.72 + Math.sin(mote.twinkle) * 0.28);
         if (a <= 0.004) continue;
 
-        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.globalAlpha = Math.min(1, a);
         ctx.beginPath();
         ctx.arc(p.sx, p.sy, Math.min(2.1, Math.max(0.55, p.s * 1.6)), 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.globalAlpha = 1;
 
       /* Long-exposure light trails riding the road. */
       ctx.lineCap = 'round';

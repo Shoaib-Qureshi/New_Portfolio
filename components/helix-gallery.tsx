@@ -62,6 +62,7 @@ export function HelixGallerySection({ images, containerRef }: {
   const [wiping, setWiping] = useState(false);
   const [reducedMotion, setReducedMotion] = useState<boolean | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [near, setNear] = useState(false);
   const [page, setPage] = useState(0);
   const [paging, setPaging] = useState(false);
   const pageTween = useRef<gsap.core.Tween | null>(null);
@@ -149,13 +150,26 @@ export function HelixGallerySection({ images, containerRef }: {
     return () => observer.disconnect();
   }, [containerRef]);
 
+  // The WebGL renderer, shader compile and 9 full-size texture downloads are
+  // the heaviest startup work on the page. Defer them until the section is a
+  // few screens away; the DOM (and so every scroll position) is unchanged.
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || near) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setNear(true);
+    }, { root: containerRef.current, rootMargin: '300% 0px' });
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [containerRef, near]);
+
   useEffect(() => {
     const section = sectionRef.current;
     const stage = stageRef.current;
     const canvas = canvasRef.current;
     const grid = gridRef.current;
     const scroller = containerRef.current;
-    if (!section || !stage || !canvas || !grid || !scroller || reducedMotion === null || staticLayout || !images.length) return;
+    if (!near || !section || !stage || !canvas || !grid || !scroller || reducedMotion === null || staticLayout || !images.length) return;
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -490,7 +504,7 @@ export function HelixGallerySection({ images, containerRef }: {
       guides.forEach(({ line }) => { line.geometry.dispose(); line.material.dispose(); });
       renderer.dispose();
     };
-  }, [images, containerRef, reducedMotion, staticLayout]);
+  }, [images, containerRef, reducedMotion, staticLayout, near]);
 
   const browse = () => {
     const trigger = triggerRef.current;
