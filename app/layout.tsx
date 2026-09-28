@@ -22,6 +22,9 @@ export const metadata: Metadata = {
     description: 'Interactive frontend portfolio with selected product, commerce, and CMS work.',
     type: 'website',
   },
+  verification: {
+    google: 'n8AkbCw_cSfLXj0ysLJE2g8KqTZ82yS4lNi8KHlGEP4',
+  },
 };
 
 export const viewport: Viewport = {
