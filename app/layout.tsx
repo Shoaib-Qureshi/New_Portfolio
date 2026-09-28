@@ -17,11 +17,15 @@ export const metadata: Metadata = {
     'Premium interactive portfolio of Shoaib Qureshi, a frontend developer crafting React, WordPress, WooCommerce, and cinematic web experiences.',
   authors: [{ name: 'Shoaib Qureshi' }],
   metadataBase: new URL('https://shoaibqureshi.dev'),
+  alternates: { canonical: '/' },
   openGraph: {
     title: 'Shoaib Qureshi - Frontend Developer',
     description: 'Interactive frontend portfolio with selected product, commerce, and CMS work.',
     type: 'website',
+    url: '/',
+    siteName: 'Shoaib Qureshi',
   },
+  twitter: { card: 'summary_large_image' },
   verification: {
     google: 'n8AkbCw_cSfLXj0ysLJE2g8KqTZ82yS4lNi8KHlGEP4',
   },
