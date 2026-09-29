@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import Script from 'next/script';
 import { AgentationDev } from '@/components/agentation-dev';
+import { SITE_URL } from '@/lib/site';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
   description:
     'Premium interactive portfolio of Shoaib Qureshi, a frontend developer crafting React, WordPress, WooCommerce, and cinematic web experiences.',
   authors: [{ name: 'Shoaib Qureshi' }],
-  metadataBase: new URL('https://shoaibqureshi.dev'),
+  metadataBase: new URL(SITE_URL),
   alternates: { canonical: '/' },
   openGraph: {
     title: 'Shoaib Qureshi - Frontend Developer',

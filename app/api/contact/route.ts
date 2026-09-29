@@ -35,10 +35,12 @@ function ensureTable() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { name?: string; email?: string; message?: string };
+    const body = (await req.json()) as { name?: string; email?: string; message?: string; intent?: string };
     const name = body.name?.trim() ?? '';
     const email = body.email?.trim() ?? '';
     const message = body.message?.trim() ?? '';
+    // Optional triage hint from the form's select; anything else is dropped.
+    const intent = body.intent && ['freelance', 'job', 'other'].includes(body.intent) ? body.intent : undefined;
 
     if (!name || !email || !message) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
     // mail failure never loses a submission — we just log it and still return ok.
     let emailed = false;
     try {
-      emailed = await sendContactEmail({ name, email, message }, meta);
+      emailed = await sendContactEmail({ name, email, message, intent }, meta);
       if (!emailed) {
         console.warn(
           '[contact] Email NOT sent: mailer not configured. Set GOOGLE_REFRESH_TOKEN in .env.local ' +

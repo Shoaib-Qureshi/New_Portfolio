@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { CaseStudy } from '@/components/case-study';
 import { getPortfolioContent, getProject } from '@/lib/content-store';
+import { SITE_URL } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export default async function CaseStudyPage({ params }: Props) {
     name: project.title,
     author: { '@type': 'Person', name: 'Shoaib Qureshi' },
     description: project.desc,
-    url: `https://shoaibqureshi.dev/work/${id}`,
+    url: `${SITE_URL}/work/${id}`,
   };
   return (
     <>

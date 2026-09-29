@@ -14,8 +14,13 @@ import { useRef } from 'react';
 import type { Project } from '@/lib/content-types';
 import { AnimatedShine } from '@/components/magic/animated-shine';
 import { CustomCursor } from '@/components/custom-cursor';
+import { track } from '@/lib/track';
 
 const EASE = [0.16, 1, 0.3, 1] as [number, number, number, number];
+
+// Same pill as the hero "Live site" button, reused by the closing CTA.
+const PILL =
+  'inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-white/[0.12] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md transition hover:border-white/64 hover:bg-white/[0.20]';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 32 },
@@ -213,7 +218,8 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
                     href={project.link}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-white/[0.12] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md transition hover:border-white/64 hover:bg-white/[0.20]"
+                    className={PILL}
+                    onClick={() => track('outbound_click', { project: project.id })}
                   >
                     Live site <ExternalLink className="size-3" />
                   </a>
@@ -413,6 +419,32 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
             ) : (
               <div />
             )}
+          </div>
+        </section>
+
+        {/* ── HIRE ──────────────────────────────────────────────── */}
+        <section className="mx-auto max-w-7xl px-5 pb-8 sm:px-8 md:pb-16 lg:px-10">
+          <div className="flex flex-col gap-6 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:justify-between md:pt-12">
+            <div>
+              <div className="text-[9px] uppercase tracking-[0.2em] text-white/28">Have a similar project?</div>
+              <div className="mt-0.5 text-sm font-light text-white/60">Tell me what you&apos;re building. I reply within 24 hours.</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-5">
+              <Link
+                href="/#contact"
+                className={PILL}
+                onClick={() => track('cta_click', { label: 'case_study_hire', project: project.id })}
+              >
+                Start a project <ArrowRight className="size-3" />
+              </Link>
+              <a
+                href="mailto:shoaib.saq@gmail.com"
+                className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/28 transition hover:text-white/60"
+                onClick={() => track('contact_click', { method: 'email', where: 'case_study' })}
+              >
+                shoaib.saq@gmail.com
+              </a>
+            </div>
           </div>
         </section>
 

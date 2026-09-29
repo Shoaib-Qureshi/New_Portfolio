@@ -6,6 +6,14 @@ export type ContactPayload = {
   name: string;
   email: string;
   message: string;
+  /** 'freelance' | 'job' | 'other' from the form's select, if picked. */
+  intent?: string;
+};
+
+const INTENT_LABEL: Record<string, string> = {
+  freelance: 'Freelance project',
+  job: 'Full-time role',
+  other: 'Something else',
 };
 
 export type ContactMeta = {
@@ -125,6 +133,7 @@ export async function sendContactEmail(payload: ContactPayload, meta?: ContactMe
   const email = escapeHtml(payload.email);
   const firstName = escapeHtml(payload.name.trim().split(/\s+/)[0] || 'there');
   const messageHtml = escapeHtml(payload.message).replace(/\r?\n/g, '<br>');
+  const intentLabel = payload.intent ? INTENT_LABEL[payload.intent] : undefined;
 
   // ── 1) Admin notification — enquiry + request metadata ──────────────
   const location = meta
@@ -135,6 +144,7 @@ export async function sendContactEmail(payload: ContactPayload, meta?: ContactMe
   const metaTable = meta
     ? `<div style="margin-top:30px;">${label('Request details')}
        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+         ${intentLabel ? metaRow('Looking for', intentLabel) : ''}
          ${metaRow('Date', escapeHtml(meta.date))}
          ${metaRow('IP address', escapeHtml(meta.ip))}
          ${metaRow('Location', location)}
@@ -154,7 +164,9 @@ export async function sendContactEmail(payload: ContactPayload, meta?: ContactMe
     ${metaTable}`;
 
   const adminText =
-    `New enquiry\n\nName: ${payload.name}\nEmail: ${payload.email}\n\n${payload.message}\n\n` +
+    `New enquiry\n\nName: ${payload.name}\nEmail: ${payload.email}\n` +
+    (intentLabel ? `Looking for: ${intentLabel}\n` : '') +
+    `\n${payload.message}\n\n` +
     (meta
       ? `— Request details —\nDate: ${meta.date}\nIP: ${meta.ip}\nLocation: ${meta.city ? meta.city + ', ' : ''}${meta.country}\nBrowser: ${meta.browser}\nDevice: ${meta.device} (${meta.os})\n`
       : '');
@@ -163,7 +175,7 @@ export async function sendContactEmail(payload: ContactPayload, meta?: ContactMe
     from: `Portfolio Contact <${user}>`,
     to: adminTo,
     replyTo: `${payload.name} <${payload.email}>`,
-    subject: `New portfolio enquiry from ${payload.name}`,
+    subject: `New portfolio enquiry from ${payload.name}${intentLabel ? ` · ${intentLabel}` : ''}`,
     text: adminText,
     html: shell(adminInner),
   });

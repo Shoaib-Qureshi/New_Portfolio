@@ -14,7 +14,7 @@ import {
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
-import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronRight, Code2, Filter, GitBranch, Mail, Menu, Send, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronRight, Code2, FileText, Filter, GitBranch, Mail, Menu, Send, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +25,7 @@ import Image from 'next/image';
 import { CustomCursor } from '@/components/custom-cursor';
 import { Button } from '@/components/ui/button';
 import { AnimatedShine, SectionLabel } from '@/components/magic/animated-shine';
+import { track } from '@/lib/track';
 
 const sections = ['hero', 'about', 'work', 'plugins', 'testimonials', 'contact'] as const;
 type SectionId = (typeof sections)[number];
@@ -327,7 +328,7 @@ function FloatingNav({
           ))}
         </div>
         <button
-          onClick={() => onNavigate('contact')}
+          onClick={() => { track('cta_click', { label: 'lets_connect' }); onNavigate('contact'); }}
           className="glass hidden cursor-pointer items-center gap-2 rounded-full px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/65 transition hover:text-white md:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
         >
           Let&apos;s connect
@@ -360,6 +361,15 @@ function FloatingNav({
                 <ChevronRight className="size-4 text-[var(--accent)]" />
               </button>
             ))}
+            <a
+              href="/Shoaib-Qureshi-Resume.pdf"
+              download
+              onClick={() => { track('resume_download', { where: 'menu' }); setMenuOpen(false); }}
+              className="flex items-center justify-between rounded-2xl px-4 py-4 text-left text-xs font-semibold uppercase tracking-[0.2em] text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30"
+            >
+              resume
+              <FileText className="size-4 text-[var(--accent)]" />
+            </a>
           </motion.div>
         )}
       </AnimatePresence>
@@ -476,7 +486,15 @@ function HeroSection({
         ref={availabilityCardRef}
         className="pointer-events-none absolute bottom-24 right-5 z-[5] hidden w-[210px] sm:right-8 md:block lg:right-12 lg:bottom-28 lg:w-[230px]"
       >
-        <AvailabilityHeroCard />
+        {/* The card reads as a "hire me" signal, so let it act like one. */}
+        <a
+          href="#contact"
+          onClick={(e) => { e.preventDefault(); track('cta_click', { label: 'availability_card' }); onNavigate('contact'); }}
+          className="pointer-events-auto block cursor-pointer"
+          aria-label="Available now — go to contact"
+        >
+          <AvailabilityHeroCard />
+        </a>
       </div>
 
       {/* Heading */}
@@ -501,7 +519,7 @@ function HeroSection({
               Senior frontend developer. I build React and Laravel applications, WordPress and WooCommerce systems, and AI tooling — from medical course platforms to editorial pipelines.
             </p>
             <div ref={ctaRef}>
-              <Button onClick={() => onNavigate('work')} className="w-max">
+              <Button onClick={() => { track('cta_click', { label: 'view_work' }); onNavigate('work'); }} className="w-max">
                 View work <ArrowUpRight className="size-4" />
               </Button>
             </div>
@@ -2601,7 +2619,7 @@ function TestimonialCard({ testimonial }: { testimonial: PortfolioContent['testi
 }
 
 function ContactSection() {
-  const [form, setForm] = useState({ name: '', email: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', message: '', intent: '' });
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -2624,6 +2642,7 @@ function ContactSection() {
       });
       if (res.ok) {
         setSent(true);
+        track('contact_submit', { intent: form.intent || 'unspecified' });
       } else {
         setError('Something went wrong. Please try again or email me directly.');
       }
@@ -2665,14 +2684,15 @@ function ContactSection() {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="mt-10 space-y-5 text-sm text-white/54"
           >
-            <a className="flex items-center gap-3 transition hover:text-white" href="mailto:shoaib.saq@gmail.com">
+            <a className="flex items-center gap-3 transition hover:text-white" href="mailto:shoaib.saq@gmail.com" onClick={() => track('contact_click', { method: 'email' })}>
               <Mail className="size-4 text-[var(--accent)]" /> shoaib.saq@gmail.com
             </a>
             <a
               className="flex items-center gap-3 transition hover:text-white"
               href="https://www.linkedin.com/in/shoaib-alam-qureshi/"
               target="_blank"
-              rel="noreferrer"
+              rel="me noreferrer"
+              onClick={() => track('contact_click', { method: 'linkedin' })}
             >
               <ArrowUpRight className="size-4 text-[var(--accent)]" /> LinkedIn
             </a>
@@ -2680,9 +2700,18 @@ function ContactSection() {
               className="flex items-center gap-3 transition hover:text-white"
               href="https://github.com/Shoaib-Qureshi"
               target="_blank"
-              rel="noreferrer"
+              rel="me noreferrer"
+              onClick={() => track('contact_click', { method: 'github' })}
             >
               <Code2 className="size-4 text-[var(--accent)]" /> GitHub
+            </a>
+            <a
+              className="flex items-center gap-3 transition hover:text-white"
+              href="/Shoaib-Qureshi-Resume.pdf"
+              download
+              onClick={() => track('resume_download', { where: 'contact' })}
+            >
+              <FileText className="size-4 text-[var(--accent)]" /> Resume (PDF)
             </a>
           </motion.div>
         </motion.div>
@@ -2722,6 +2751,22 @@ function ContactSection() {
                   value={form.email}
                   onChange={(v) => setForm((c) => ({ ...c, email: v }))}
                 />
+                <label className="grid gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-white/42">What do you need?</span>
+                  <select
+                    value={form.intent}
+                    onChange={(e) => setForm((c) => ({ ...c, intent: e.target.value }))}
+                    className={cn(
+                      'h-14 rounded-full border border-white/10 bg-black/20 px-7 text-sm outline-none transition focus:border-[rgba(var(--accent-rgb),0.55)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--accent-rgb),0.55)] [&>option]:bg-[#0d0f14] [&>option]:text-white',
+                      form.intent ? 'text-white' : 'text-white/24',
+                    )}
+                  >
+                    <option value="">Pick one (optional)</option>
+                    <option value="freelance">Freelance project</option>
+                    <option value="job">Full-time role</option>
+                    <option value="other">Something else</option>
+                  </select>
+                </label>
                 <label className="grid gap-2">
                   <span className="text-[10px] uppercase tracking-[0.18em] text-white/42">Project notes</span>
                   <textarea
@@ -2782,6 +2827,11 @@ function Footer() {
   return (
     <footer className="mx-auto flex max-w-7xl flex-col gap-3 border-t border-white/10 px-5 py-8 text-[10px] uppercase tracking-[0.18em] text-white/32 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
       <span>© {new Date().getFullYear()} Shoaib Qureshi / Bengaluru, India</span>
+      <span className="flex flex-wrap gap-x-5 gap-y-1">
+        <a href="https://www.linkedin.com/in/shoaib-alam-qureshi/" target="_blank" rel="me noreferrer" className="transition hover:text-white/60" onClick={() => track('contact_click', { method: 'linkedin', where: 'footer' })}>LinkedIn</a>
+        <a href="https://github.com/Shoaib-Qureshi" target="_blank" rel="me noreferrer" className="transition hover:text-white/60" onClick={() => track('contact_click', { method: 'github', where: 'footer' })}>GitHub</a>
+        <a href="mailto:shoaib.saq@gmail.com" className="transition hover:text-white/60" onClick={() => track('contact_click', { method: 'email', where: 'footer' })}>Email</a>
+      </span>
       <span>Next.js · Tailwind · GSAP</span>
     </footer>
   );

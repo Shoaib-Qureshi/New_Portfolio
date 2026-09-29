@@ -1,5 +1,6 @@
 import { PortfolioExperience } from '@/components/portfolio-experience';
 import { getPortfolioContent } from '@/lib/content-store';
+import { SITE_URL } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ const jsonLd = [
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: 'Shoaib Qureshi',
-    url: 'https://shoaibqureshi.dev',
+    url: SITE_URL,
     jobTitle: 'Senior Frontend Developer',
     address: { '@type': 'PostalAddress', addressLocality: 'Bengaluru', addressCountry: 'IN' },
     sameAs: ['https://github.com/Shoaib-Qureshi', 'https://www.linkedin.com/in/shoaib-alam-qureshi/'],
@@ -18,7 +19,7 @@ const jsonLd = [
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Shoaib Qureshi - Frontend Developer Portfolio',
-    url: 'https://shoaibqureshi.dev',
+    url: SITE_URL,
   },
 ];
 
