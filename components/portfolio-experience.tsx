@@ -349,7 +349,7 @@ function FloatingNav({
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="glass mx-4 mt-3 grid rounded-3xl p-2 md:hidden"
+            className="glass glass-liquid mx-4 mt-3 grid rounded-3xl p-2 md:hidden"
           >
             {sections.filter((id) => !hiddenSections.includes(id)).map((id) => (
               <button
@@ -1080,7 +1080,51 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
   const categories = useMemo(() => ['All', ...Array.from(new Set(projects.map((p) => p.category)))], []);
   const [filter, setFilter] = useState('All');
   const filtered = filter === 'All' ? projects : projects.filter((p) => p.category === filter);
+  // Desktop grid shows the first five until expanded; the mobile carousel always has every card.
+  const COLLAPSED = 5;
+  const [expanded, setExpanded] = useState(false);
+  const canExpand = filtered.length > COLLAPSED;
   const [showSpline, setShowSpline] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  // Mobile/tablet carousel auto-advance: one card every few seconds while the
+  // carousel is on screen, wrapping back to the start. Any touch, wheel or focus
+  // pauses it, and it resumes after the visitor has been idle for a while.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const mobile = window.matchMedia('(max-width: 1023px)');
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const STEP_MS = 3500;
+    const RESUME_MS = 6000;
+    let visible = false;
+    let pausedUntil = 0;
+    const pause = () => { pausedUntil = Date.now() + RESUME_MS; };
+
+    const io = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { threshold: 0.5 });
+    io.observe(el);
+
+    const id = window.setInterval(() => {
+      if (!mobile.matches || !visible || document.hidden || Date.now() < pausedUntil) return;
+      const cards = Array.from(el.querySelectorAll<HTMLElement>('article'));
+      if (cards.length < 2) return;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 8;
+      // Snap position of each card, matching the CSS scroll-padding the snap uses.
+      const pad = parseFloat(getComputedStyle(el).scrollPaddingLeft) || 0;
+      const next = cards.map((c) => c.offsetLeft - el.offsetLeft - pad).find((x) => x > el.scrollLeft + 8);
+      el.scrollTo({ left: atEnd || next === undefined ? 0 : next, behavior: 'smooth' });
+    }, STEP_MS);
+
+    const events = ['pointerdown', 'touchstart', 'wheel', 'focusin'] as const;
+    events.forEach((e) => el.addEventListener(e, pause, { passive: true }));
+    return () => {
+      window.clearInterval(id);
+      io.disconnect();
+      events.forEach((e) => el.removeEventListener(e, pause));
+    };
+  }, []);
+
   useEffect(() => {
     // Only load the heavy Spline 3D runtime on capable desktops. Mobile/touch
     // devices and reduced-motion users get the gradient fallback instead, saving
@@ -1166,6 +1210,7 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
         {/* Right vignette — hints at more cards on mobile */}
         <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-[var(--background)] to-transparent lg:hidden" />
         <div
+          ref={scrollerRef}
           className="flex snap-x snap-mandatory touch-auto gap-4 overflow-x-auto overflow-y-hidden scroll-pl-5 px-5 sm:scroll-pl-8 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0"
         >
           <AnimatePresence mode="popLayout">
@@ -1174,6 +1219,7 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
                 key={project.id}
                 project={project}
                 index={index}
+                hiddenOnDesktop={!expanded && index >= COLLAPSED}
               />
             ))}
           </AnimatePresence>
@@ -1182,6 +1228,23 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
         </div>
       </div>
 
+      {canExpand && (
+        <div className="relative z-10 mt-10 hidden justify-center lg:flex">
+          <button
+            type="button"
+            onClick={() => {
+              if (expanded) document.getElementById('work')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setExpanded((v) => !v);
+            }}
+            aria-expanded={expanded}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60 transition duration-300 hover:border-white/20 hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            {expanded ? 'Show less' : `Show more (${filtered.length - COLLAPSED})`}
+            {expanded ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />}
+          </button>
+        </div>
+      )}
+
     </section>
   );
 }
@@ -1189,9 +1252,11 @@ function ProjectsSection({ projects }: { projects: Project[] }) {
 function ProjectCard({
   project,
   index,
+  hiddenOnDesktop = false,
 }: {
   project: Project;
   index: number;
+  hiddenOnDesktop?: boolean;
 }) {
   const Icon = getIcon(project.iconKey);
   return (
@@ -1203,7 +1268,7 @@ function ProjectCard({
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: index * 0.09 }}
       viewport={{ once: true, margin: '-80px' }}
       data-cursor="interactive"
-      className="group relative w-[70vw] max-w-[300px] shrink-0 snap-start overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#0d0f14] transition duration-500 hover:-translate-y-1 hover:border-white/20 hover:bg-[#11141b] hover:shadow-[0_30px_110px_rgba(0,0,0,0.48),0_0_44px_rgba(var(--accent-rgb),0.055)] sm:max-w-[360px] lg:w-auto lg:max-w-none lg:shrink"
+      className={`group relative w-[70vw] max-w-[300px] shrink-0 snap-start overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#0d0f14] transition duration-500 hover:-translate-y-1 hover:border-white/20 hover:bg-[#11141b] hover:shadow-[0_30px_110px_rgba(0,0,0,0.48),0_0_44px_rgba(var(--accent-rgb),0.055)] sm:max-w-[360px] lg:w-auto lg:max-w-none lg:shrink${hiddenOnDesktop ? ' lg:hidden' : ''}`}
     >
       <Link
         href={`/work/${project.id}`}
@@ -2660,7 +2725,7 @@ function ContactSection() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.15 }}
         transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-        className="grid gap-12 rounded-[34px] border border-white/10 bg-white/[0.035] p-6 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:p-10"
+        className="grid gap-12 rounded-3xl border border-white/10 bg-white/[0.035] p-6 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:p-10"
       >
         {/* Left — info */}
         <motion.div

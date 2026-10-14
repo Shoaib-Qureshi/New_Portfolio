@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useRef } from 'react';
 import type { Project } from '@/lib/content-types';
 import { AnimatedShine } from '@/components/magic/animated-shine';
+import { CenterFlow, FLOWS } from '@/components/center-flow';
 import { CustomCursor } from '@/components/custom-cursor';
 import { track } from '@/lib/track';
 
@@ -44,17 +45,25 @@ function Reveal({
   delay?: number;
   className?: string;
 }) {
+  // The child starts translated fully outside its overflow-hidden wrapper, so
+  // observing the child never reports it in view. Observe the wrapper and let
+  // the variant propagate down instead.
   return (
-    <div className={`overflow-hidden${className ? ` ${className}` : ''}`}>
+    <motion.div
+      className={`overflow-hidden${className ? ` ${className}` : ''}`}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: '-48px' }}
+    >
       <motion.div
-        initial={{ y: '108%', clipPath: 'inset(0 0 100% 0)', opacity: 0 }}
-        whileInView={{ y: '0%', clipPath: 'inset(0 0 0% 0)', opacity: 1 }}
-        viewport={{ once: true, margin: '-48px' }}
-        transition={{ duration: 0.88, ease: EASE, delay }}
+        variants={{
+          hidden: { y: '108%', clipPath: 'inset(0 0 100% 0)', opacity: 0 },
+          show: { y: '0%', clipPath: 'inset(0 0 0% 0)', opacity: 1, transition: { duration: 0.88, ease: EASE, delay } },
+        }}
       >
         {children}
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -106,6 +115,8 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
   const idx = projects.findIndex((p) => p.id === project.id);
   const prev = idx > 0 ? projects[idx - 1] : null;
   const next = idx < projects.length - 1 ? projects[idx + 1] : null;
+  // With a flow, the process screenshot becomes the diagram's hub instead of the faded band.
+  const flow = FLOWS[project.id];
 
   return (
     <>
@@ -187,7 +198,7 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
                 initial={{ y: '108%', clipPath: 'inset(0 0 100% 0)', opacity: 0 }}
                 animate={{ y: '0%', clipPath: 'inset(0 0 0% 0)', opacity: 1 }}
                 transition={{ duration: 0.88, ease: EASE, delay: 0.22 }}
-                className="text-[clamp(3.8rem,9.5vw,9rem)] font-light leading-[0.85] tracking-[-0.072em] text-white"
+                className="text-[clamp(3.8rem,9.5vw,9rem)] font-light leading-[0.85] pb-[0.12em] tracking-[-0.072em] text-white"
               >
                 {project.title}
               </motion.h1>
@@ -289,9 +300,39 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
           </div>
         </section>
 
+        {/* ── AUTOMATION FLOW ───────────────────────────────────── */}
+        {flow && (
+          <section className="relative overflow-hidden py-6 md:py-8">
+            {/* The process screenshot, pushed right and masked so it dissolves into the
+                page on every side instead of ending at a visible edge. */}
+            {project.processImage.src && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 top-1/2 aspect-[420/275] w-[92%] -translate-x-1/2 -translate-y-1/2 overflow-hidden opacity-20 md:left-auto md:right-[2%] md:w-[60%] md:translate-x-0"
+                style={{
+                  // Soft ellipse: solid at the centre, gone before every edge.
+                  maskImage: 'radial-gradient(ellipse 50% 50% at 50% 50%, #000 35%, transparent 100%)',
+                  WebkitMaskImage: 'radial-gradient(ellipse 50% 50% at 50% 50%, #000 35%, transparent 100%)',
+                }}
+              >
+                {/* Crop to the laptop screen only. The mockup is 1024×1024 and its screen
+                    spans x 350–770, y 345–650 (box trimmed to 345–620, 10% shorter), so the image is scaled up and offset to
+                    put exactly that region in the box. Specific to this asset. */}
+                <div className="absolute" style={{ width: `${(1024 / 420) * 100}%`, height: `${(1024 / 275) * 100}%`, left: `${(-350 / 420) * 100}%`, top: `${(-345 / 275) * 100}%` }}>
+                  <Image src={project.processImage.src} alt="" fill sizes="(max-width: 768px) 220vw, 150vw" className="object-cover saturate-[0.75]" />
+                </div>
+              </div>
+            )}
+            <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+              <CenterFlow {...flow} layout="compact" className="md:hidden" />
+              <CenterFlow {...flow} layout="wide" className="hidden md:block" />
+            </div>
+          </section>
+        )}
+
         {/* ── PROCESS ───────────────────────────────────────────── */}
-        <section className="relative mt-0 pb-12 pt-12 sm:pt-52 md:mt-8 md:pb-24 lg:pt-60">
-          <div className="pointer-events-none absolute inset-x-0 -top-12 h-[280px] opacity-55 md:-top-20 md:h-[480px] md:opacity-58">
+        <section className={`relative mt-0 pb-12 md:pb-24 ${flow ? 'pt-6 md:pt-8' : 'pt-12 sm:pt-52 md:mt-8 lg:pt-60'}`}>
+          {!flow && <div className="pointer-events-none absolute inset-x-0 -top-12 h-[280px] opacity-55 md:-top-20 md:h-[480px] md:opacity-58">
             {project.processImage.src && (
               <Image
                 src={project.processImage.src}
@@ -308,7 +349,7 @@ export function CaseStudy({ project, projects }: { project: Project | null; proj
                 background: 'linear-gradient(180deg, #06080d 0%, #06080d 16%, rgba(6,8,13,0.68) 32%, rgba(6,8,13,0.20) 50%, rgba(6,8,13,0.62) 68%, #06080d 84%)',
               }}
             />
-          </div>
+          </div>}
           <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
           <div className="mb-8 md:mb-12">
             <Reveal>

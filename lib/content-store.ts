@@ -44,11 +44,23 @@ const PROJECT_IMAGES_BY_ID: Record<string, { image: Project['image']; processIma
     image: { src: '/uploads/1780413509037-bd2d0ed5-7be9-4f12-a9b6-9d98604f7997.png', alt: 'Logistics supply chain operations aerial view' },
     processImage: { src: '/uploads/1780413636710-370ba5e6-0b7b-4a2a-8566-de3ddde05361.png', alt: 'Content strategy and editorial planning workspace' },
   },
+  thekua: {
+    image: { src: '/img/projects/thekua-hero.jpg', alt: 'The Thekua Company homepage hero' },
+    processImage: { src: '/img/projects/thekua-process.jpg', alt: 'The Thekua Company product range' },
+  },
+  guilded: {
+    image: { src: '/img/projects/guilded-hero.jpg', alt: 'Guilded landing page hero' },
+    processImage: { src: '/img/projects/guilded-process.jpg', alt: 'Guilded marketing page section' },
+  },
   'frontend-auditor': {
     image: { src: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=70', alt: 'Code editor with frontend performance audit results' },
     processImage: { src: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=70', alt: 'Analytics dashboard showing web performance metrics' },
   },
 };
+
+// Display order, strongest first. Projects not listed (e.g. added later in
+// admin) keep their stored order after these. Card numbers follow this order.
+const PROJECT_ORDER = ['thekua', 'prepmedico', 'guilded', 'liquidflow', 'threadwrite', 'frontend-auditor', 'ananth-decodes'];
 
 type ContentKey = (typeof CONTENT_KEYS)[number];
 
@@ -158,7 +170,19 @@ async function kvWrite(content: PortfolioContent): Promise<void> {
 async function kvSeedIfNeeded(): Promise<void> {
   const { kv } = await import('@vercel/kv');
   const existing = await kv.get(`${KV_PREFIX}projects`);
-  if (existing !== null && existing !== undefined) return;
+  if (existing !== null && existing !== undefined) {
+    // Already seeded: append any seed projects missing from KV, mirroring the
+    // SQLite merge, so new entries in seed-content.ts reach production.
+    try {
+      const stored: Project[] = typeof existing === 'string' ? JSON.parse(existing) : (existing as Project[]);
+      const ids = new Set(stored.map((p) => p.id));
+      const incoming = seedContent.projects.filter((p) => !ids.has(p.id));
+      if (incoming.length) await kv.set(`${KV_PREFIX}projects`, JSON.stringify([...stored, ...incoming]));
+    } catch {
+      // ignore malformed stored JSON
+    }
+    return;
+  }
   // First request ever — seed from seed-content.ts
   const pipeline = kv.pipeline();
   const seed = seedContent as unknown as Record<ContentKey, unknown>;
@@ -171,7 +195,7 @@ async function kvSeedIfNeeded(): Promise<void> {
 export async function getPortfolioContent(): Promise<PortfolioContent> {
   if (IS_SERVERLESS && HAS_KV) {
     await kvSeedIfNeeded();
-    const projects = normalizeProjectImages(normalizeProjectColors(await kvRead('projects', seedContent.projects)));
+    const projects = orderProjects(normalizeProjectImages(normalizeProjectColors(await kvRead('projects', seedContent.projects))));
     return {
       projects,
       galleryImages: seedContent.galleryImages,
@@ -185,7 +209,7 @@ export async function getPortfolioContent(): Promise<PortfolioContent> {
   }
 
   // Local dev or Netlify without KV → SQLite
-  const projects = normalizeProjectImages(normalizeProjectColors(dbRead('projects', seedContent.projects)));
+  const projects = orderProjects(normalizeProjectImages(normalizeProjectColors(dbRead('projects', seedContent.projects))));
   return {
     projects,
     galleryImages: seedContent.galleryImages,
@@ -242,6 +266,17 @@ function normalizeProjectImages(projects: Project[]) {
     ...project,
     ...(PROJECT_IMAGES_BY_ID[project.id] ?? {}),
   }));
+}
+
+function orderProjects(projects: Project[]) {
+  const rank = (p: Project) => {
+    const i = PROJECT_ORDER.indexOf(p.id);
+    return i === -1 ? PROJECT_ORDER.length : i;
+  };
+  // Array.prototype.sort is stable, so unlisted projects keep their stored order.
+  return [...projects]
+    .sort((a, b) => rank(a) - rank(b))
+    .map((p, i) => ({ ...p, num: String(i + 1).padStart(2, '0') }));
 }
 
 // ── Upload helpers (unchanged) ─────────────────────────────────────────────────

@@ -80,8 +80,25 @@ textarea {
 .glass {
   border: 1px solid var(--border);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.078), rgba(255, 255, 255, 0.03));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+  /* Original drop shadow, plus inset highlights that read as a refracting rim. */
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.38),
+    inset 3px 3px 0.5px -3.5px rgba(255, 255, 255, 0.09),
+    inset -3px -3px 0.5px -3.5px rgba(255, 255, 255, 0.85),
+    inset 1px 1px 1px -0.5px rgba(255, 255, 255, 0.6),
+    inset -1px -1px 1px -0.5px rgba(255, 255, 255, 0.6),
+    inset 0 0 6px 6px rgba(255, 255, 255, 0.12),
+    inset 0 0 2px 2px rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(22px);
+}
+
+/* The ripple (SVG filter in app/layout.tsx) re-runs on every frame of whatever
+   is behind it. Pinned over the animated hero it cost 30 Lighthouse points, so
+   it is limited to surfaces off the first paint (.glass-liquid) and to hover.
+   Chromium only: Safari and Firefox reject url() here and keep the blur above. */
+.glass:hover,
+.glass-liquid {
+  backdrop-filter: url(#liquid-glass) blur(22px);
 }
 
 .text-balance {
